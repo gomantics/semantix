@@ -1,0 +1,15 @@
+meta {
+  name: Workspace Delete
+  type: http
+  seq: 5
+}
+
+delete {
+  url: http://localhost:3001/v1/workspaces/2
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+}
