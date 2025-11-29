@@ -1,0 +1,16 @@
+meta {
+  name: Workspace
+  type: http
+  seq: 4
+}
+
+get {
+  url: http://localhost:3001/v1/workspaces/3
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
