@@ -2,11 +2,13 @@ package workspaces
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/gomantics/semantix/db"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var (
@@ -25,13 +27,24 @@ func Create(ctx context.Context, params CreateParams) (*Workspace, error) {
 		return nil, err
 	}
 
-	now := time.Now().Unix()
+	now := time.Now().UnixNano()
+	settings := params.Settings
+	if settings == nil {
+		settings = make(map[string]any)
+	}
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return nil, err
+	}
+
 	dbWorkspace, err := db.Query1(ctx, func(q *db.Queries) (db.Workspace, error) {
 		return q.CreateWorkspace(ctx, db.CreateWorkspaceParams{
-			Name:    params.Name,
-			Slug:    params.Slug,
-			Created: now,
-			Updated: now,
+			Name:        params.Name,
+			Slug:        params.Slug,
+			Description: toPgText(params.Description),
+			Settings:    settingsJSON,
+			Created:     now,
+			Updated:     now,
 		})
 	})
 	if err != nil {
@@ -113,13 +126,24 @@ func Update(ctx context.Context, id int64, params UpdateParams) (*Workspace, err
 		return nil, err
 	}
 
-	now := time.Now().Unix()
+	now := time.Now().UnixNano()
+	settings := params.Settings
+	if settings == nil {
+		settings = make(map[string]any)
+	}
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return nil, err
+	}
+
 	dbWorkspace, err := db.Query1(ctx, func(q *db.Queries) (db.Workspace, error) {
 		return q.UpdateWorkspace(ctx, db.UpdateWorkspaceParams{
-			ID:      id,
-			Name:    params.Name,
-			Slug:    params.Slug,
-			Updated: now,
+			ID:          id,
+			Name:        params.Name,
+			Slug:        params.Slug,
+			Description: toPgText(params.Description),
+			Settings:    settingsJSON,
+			Updated:     now,
 		})
 	})
 	if err != nil {
@@ -145,11 +169,33 @@ func Delete(ctx context.Context, id int64) error {
 }
 
 func toWorkspace(dbWorkspace db.Workspace) *Workspace {
-	return &Workspace{
-		ID:      dbWorkspace.ID,
-		Name:    dbWorkspace.Name,
-		Slug:    dbWorkspace.Slug,
-		Created: dbWorkspace.Created,
-		Updated: dbWorkspace.Updated,
+	var description *string
+	if dbWorkspace.Description.Valid {
+		description = &dbWorkspace.Description.String
 	}
+
+	var settings map[string]any
+	if len(dbWorkspace.Settings) > 0 {
+		_ = json.Unmarshal(dbWorkspace.Settings, &settings)
+	}
+	if settings == nil {
+		settings = make(map[string]any)
+	}
+
+	return &Workspace{
+		ID:          dbWorkspace.ID,
+		Name:        dbWorkspace.Name,
+		Slug:        dbWorkspace.Slug,
+		Description: description,
+		Settings:    settings,
+		Created:     dbWorkspace.Created,
+		Updated:     dbWorkspace.Updated,
+	}
+}
+
+func toPgText(s *string) pgtype.Text {
+	if s == nil {
+		return pgtype.Text{Valid: false}
+	}
+	return pgtype.Text{String: *s, Valid: true}
 }

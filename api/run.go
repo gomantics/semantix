@@ -7,11 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gomantics/semantix/api/gittokens"
 	"github.com/gomantics/semantix/api/health"
-	"github.com/gomantics/semantix/api/repositories"
-	"github.com/gomantics/semantix/api/search"
-	"github.com/gomantics/semantix/api/workspaces"
 	"github.com/gomantics/semantix/config"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -121,8 +117,10 @@ func configureMiddleware(e *echo.Echo, l *zap.Logger) {
 
 func configureRoutes(e *echo.Echo, l *zap.Logger) {
 	health.Configure(e, l)
-	workspaces.Configure(e, l)
-	gittokens.Configure(e, l)
-	repositories.Configure(e, l)
-	search.Configure(e, l)
+
+	// TODO: Phase 1-3 - Add routes as they are implemented
+	// workspaces.Configure(e, l)
+	// gittokens.Configure(e, l)
+	// repositories.Configure(e, l)
+	// search.Configure(e, l)
 }

@@ -3,9 +3,7 @@ package main
 import (
 	"github.com/gomantics/semantix/api"
 	"github.com/gomantics/semantix/db"
-	"github.com/gomantics/semantix/domains/indexing"
 	"github.com/gomantics/semantix/libs/logger"
-	"github.com/gomantics/semantix/libs/milvus"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
@@ -21,8 +19,8 @@ func main() {
 		}),
 		fx.Invoke(
 			db.Init,
-			milvus.Init,
-			indexing.StartWorker,
+			// TODO: Add Qdrant initialization (Phase 1)
+			// TODO: Re-enable indexing worker (Phase 2)
 			api.Run,
 		),
 		fx.WithLogger(func(l *zap.Logger) fxevent.Logger {

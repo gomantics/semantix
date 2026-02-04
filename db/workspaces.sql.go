@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const countWorkspaces = `-- name: CountWorkspaces :one
@@ -22,22 +24,26 @@ func (q *Queries) CountWorkspaces(ctx context.Context) (int64, error) {
 }
 
 const createWorkspace = `-- name: CreateWorkspace :one
-INSERT INTO workspaces (name, slug, created, updated)
-VALUES ($1, $2, $3, $4)
-RETURNING id, name, slug, created, updated
+INSERT INTO workspaces (name, slug, description, settings, created, updated)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, name, slug, description, settings, created, updated
 `
 
 type CreateWorkspaceParams struct {
-	Name    string `json:"name"`
-	Slug    string `json:"slug"`
-	Created int64  `json:"created"`
-	Updated int64  `json:"updated"`
+	Name        string      `json:"name"`
+	Slug        string      `json:"slug"`
+	Description pgtype.Text `json:"description"`
+	Settings    []byte      `json:"settings"`
+	Created     int64       `json:"created"`
+	Updated     int64       `json:"updated"`
 }
 
 func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error) {
 	row := q.db.QueryRow(ctx, createWorkspace,
 		arg.Name,
 		arg.Slug,
+		arg.Description,
+		arg.Settings,
 		arg.Created,
 		arg.Updated,
 	)
@@ -46,6 +52,8 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 		&i.ID,
 		&i.Name,
 		&i.Slug,
+		&i.Description,
+		&i.Settings,
 		&i.Created,
 		&i.Updated,
 	)
@@ -63,7 +71,7 @@ func (q *Queries) DeleteWorkspace(ctx context.Context, id int64) error {
 }
 
 const getWorkspaceByID = `-- name: GetWorkspaceByID :one
-SELECT id, name, slug, created, updated
+SELECT id, name, slug, description, settings, created, updated
 FROM workspaces
 WHERE id = $1
 `
@@ -75,6 +83,8 @@ func (q *Queries) GetWorkspaceByID(ctx context.Context, id int64) (Workspace, er
 		&i.ID,
 		&i.Name,
 		&i.Slug,
+		&i.Description,
+		&i.Settings,
 		&i.Created,
 		&i.Updated,
 	)
@@ -82,7 +92,7 @@ func (q *Queries) GetWorkspaceByID(ctx context.Context, id int64) (Workspace, er
 }
 
 const getWorkspaceBySlug = `-- name: GetWorkspaceBySlug :one
-SELECT id, name, slug, created, updated
+SELECT id, name, slug, description, settings, created, updated
 FROM workspaces
 WHERE slug = $1
 `
@@ -94,6 +104,8 @@ func (q *Queries) GetWorkspaceBySlug(ctx context.Context, slug string) (Workspac
 		&i.ID,
 		&i.Name,
 		&i.Slug,
+		&i.Description,
+		&i.Settings,
 		&i.Created,
 		&i.Updated,
 	)
@@ -101,7 +113,7 @@ func (q *Queries) GetWorkspaceBySlug(ctx context.Context, slug string) (Workspac
 }
 
 const listWorkspaces = `-- name: ListWorkspaces :many
-SELECT id, name, slug, created, updated
+SELECT id, name, slug, description, settings, created, updated
 FROM workspaces
 ORDER BY created DESC
 LIMIT $1 OFFSET $2
@@ -125,6 +137,8 @@ func (q *Queries) ListWorkspaces(ctx context.Context, arg ListWorkspacesParams) 
 			&i.ID,
 			&i.Name,
 			&i.Slug,
+			&i.Description,
+			&i.Settings,
 			&i.Created,
 			&i.Updated,
 		); err != nil {
@@ -141,17 +155,21 @@ func (q *Queries) ListWorkspaces(ctx context.Context, arg ListWorkspacesParams) 
 const updateWorkspace = `-- name: UpdateWorkspace :one
 UPDATE workspaces
 SET name = $2,
-  slug = $3,
-  updated = $4
+    slug = $3,
+    description = $4,
+    settings = $5,
+    updated = $6
 WHERE id = $1
-RETURNING id, name, slug, created, updated
+RETURNING id, name, slug, description, settings, created, updated
 `
 
 type UpdateWorkspaceParams struct {
-	ID      int64  `json:"id"`
-	Name    string `json:"name"`
-	Slug    string `json:"slug"`
-	Updated int64  `json:"updated"`
+	ID          int64       `json:"id"`
+	Name        string      `json:"name"`
+	Slug        string      `json:"slug"`
+	Description pgtype.Text `json:"description"`
+	Settings    []byte      `json:"settings"`
+	Updated     int64       `json:"updated"`
 }
 
 func (q *Queries) UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) (Workspace, error) {
@@ -159,6 +177,8 @@ func (q *Queries) UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams
 		arg.ID,
 		arg.Name,
 		arg.Slug,
+		arg.Description,
+		arg.Settings,
 		arg.Updated,
 	)
 	var i Workspace
@@ -166,6 +186,8 @@ func (q *Queries) UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams
 		&i.ID,
 		&i.Name,
 		&i.Slug,
+		&i.Description,
+		&i.Settings,
 		&i.Created,
 		&i.Updated,
 	)

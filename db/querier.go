@@ -9,45 +9,13 @@ import (
 )
 
 type Querier interface {
-	ClaimPendingRepo(ctx context.Context, updated int64) (Repo, error)
-	CountFilesByRepoID(ctx context.Context, repoID int64) (int64, error)
-	CountReposByWorkspace(ctx context.Context, workspaceID int64) (int64, error)
-	CountReposByWorkspaceAndStatus(ctx context.Context, arg CountReposByWorkspaceAndStatusParams) (int64, error)
 	CountWorkspaces(ctx context.Context) (int64, error)
-	CreateFile(ctx context.Context, arg CreateFileParams) (File, error)
-	CreateGitToken(ctx context.Context, arg CreateGitTokenParams) (GitToken, error)
-	CreateRepo(ctx context.Context, arg CreateRepoParams) (Repo, error)
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
-	DeleteFile(ctx context.Context, id int64) error
-	DeleteFilesByRepoID(ctx context.Context, repoID int64) error
-	DeleteGitToken(ctx context.Context, id int64) error
-	DeleteGitTokensByWorkspace(ctx context.Context, workspaceID int64) error
-	DeleteRepo(ctx context.Context, id int64) error
-	DeleteReposByWorkspace(ctx context.Context, workspaceID int64) error
 	DeleteWorkspace(ctx context.Context, id int64) error
-	GetFileByID(ctx context.Context, id int64) (File, error)
-	GetFileByRepoAndPath(ctx context.Context, arg GetFileByRepoAndPathParams) (File, error)
-	GetFilesWithDifferentShasum(ctx context.Context, arg GetFilesWithDifferentShasumParams) ([]File, error)
-	GetGitTokenByID(ctx context.Context, id int64) (GitToken, error)
-	GetPendingRepos(ctx context.Context, limit int32) ([]Repo, error)
-	GetRepoByID(ctx context.Context, id int64) (Repo, error)
-	GetRepoByWorkspaceAndURL(ctx context.Context, arg GetRepoByWorkspaceAndURLParams) (Repo, error)
 	GetWorkspaceByID(ctx context.Context, id int64) (Workspace, error)
 	GetWorkspaceBySlug(ctx context.Context, slug string) (Workspace, error)
-	ListFilesByRepoID(ctx context.Context, repoID int64) ([]File, error)
-	ListGitTokensByWorkspace(ctx context.Context, workspaceID int64) ([]GitToken, error)
-	ListGitTokensByWorkspaceAndProvider(ctx context.Context, arg ListGitTokensByWorkspaceAndProviderParams) ([]GitToken, error)
-	ListReposByWorkspace(ctx context.Context, arg ListReposByWorkspaceParams) ([]Repo, error)
-	ListReposByWorkspaceAndStatus(ctx context.Context, arg ListReposByWorkspaceAndStatusParams) ([]Repo, error)
 	ListWorkspaces(ctx context.Context, arg ListWorkspacesParams) ([]Workspace, error)
-	SumChunksByRepoID(ctx context.Context, repoID int64) (int64, error)
-	UpdateFileShasum(ctx context.Context, arg UpdateFileShasumParams) (File, error)
-	UpdateGitToken(ctx context.Context, arg UpdateGitTokenParams) (GitToken, error)
-	UpdateRepoAfterClone(ctx context.Context, arg UpdateRepoAfterCloneParams) (Repo, error)
-	UpdateRepoGitToken(ctx context.Context, arg UpdateRepoGitTokenParams) (Repo, error)
-	UpdateRepoStatus(ctx context.Context, arg UpdateRepoStatusParams) (Repo, error)
 	UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) (Workspace, error)
-	UpsertFile(ctx context.Context, arg UpsertFileParams) (File, error)
 }
 
 var _ Querier = (*Queries)(nil)

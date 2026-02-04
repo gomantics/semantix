@@ -11,8 +11,6 @@ type databaseConfig struct{}
 
 type indexingConfig struct{}
 
-type milvusConfig struct{}
-
 type openaiConfig struct{}
 
 type serverConfig struct{}
@@ -49,20 +47,6 @@ func (indexingConfig) MaxFileSizeBytes() int64 {
 	return 1048576
 }
 
-func (milvusConfig) Address() string {
-	if v := os.Getenv("CONFIG_MILVUS_ADDRESS"); v != "" {
-		return v
-	}
-	return "localhost:19530"
-}
-
-func (milvusConfig) CollectionName() string {
-	if v := os.Getenv("CONFIG_MILVUS_COLLECTION_NAME"); v != "" {
-		return v
-	}
-	return "code_chunks"
-}
-
 func (openaiConfig) ApiKey() string {
 	if v := os.Getenv("CONFIG_OPENAI_API_KEY"); v != "" {
 		return v
@@ -96,7 +80,6 @@ func Environment() string {
 var (
 	Database databaseConfig
 	Indexing indexingConfig
-	Milvus   milvusConfig
 	Openai   openaiConfig
 	Server   serverConfig
 )

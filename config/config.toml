@@ -7,9 +7,10 @@ cors_allowed_origins = ["http://localhost:5173"]
 [database]
 dsn = "postgres://semantix:semantix@localhost:5432/semantix?sslmode=disable"
 
-[milvus]
-address = "localhost:19530"
-collection_name = "code_chunks"
+# TODO: Phase 1 - Add Qdrant configuration
+# [qdrant]
+# address = "localhost:6334"
+# collection_name = "semantix_chunks"
 
 [openai]
 api_key = ""  # Override with CONFIG_OPENAI_API_KEY
