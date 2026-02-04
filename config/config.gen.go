@@ -58,7 +58,7 @@ func (serverConfig) CorsAllowedOrigins() []string {
 	if v := os.Getenv("CONFIG_SERVER_CORS_ALLOWED_ORIGINS"); v != "" {
 		// Array overrides not supported via env vars
 	}
-	return []string{"http://localhost:5173"}
+	return []string{"http://localhost:3000"}
 }
 
 func (serverConfig) Port() int64 {
