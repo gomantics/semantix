@@ -2,7 +2,7 @@ environment = "development"
 
 [server]
 port = 3001
-cors_allowed_origins = ["http://localhost:5173"]
+cors_allowed_origins = ["http://localhost:3000"]
 
 [database]
 dsn = "postgres://semantix:semantix@localhost:5432/semantix?sslmode=disable"
@@ -19,4 +19,3 @@ api_key = ""  # Override with CONFIG_OPENAI_API_KEY
 clone_dir = "./tmp/repos"
 max_concurrent_jobs = 2
 max_file_size_bytes = 1048576  # 1MB limit
-
