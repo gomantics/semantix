@@ -1,7 +1,7 @@
 package health
 
 import (
-	"github.com/gomantics/semantix/api/web"
+	"github.com/gomantics/semantix/internal/api/web"
 	"github.com/gomantics/semantix/db"
 )
 

@@ -36,39 +36,25 @@ Remove unused and deprecated files.
 
 ---
 
-### 0.2 Project Structure (Deferred)
+### 0.2 Project Structure
 
-Follow standard Go project layout. This will be done incrementally during later phases.
+Follow standard Go project layout.
 
-- [ ] **Standard directories** (to be done in Phase 1-2):
+- [x] **Created pkg/ and internal/ directories**:
+  - `pkg/pgconv/` - PostgreSQL type conversions (pgtype ↔ Go types)
+  - `internal/` - Ready for application-specific code
 
-  ```
-  semantix/
-  ├── cmd/
-  │   └── api/              # Main application entry point
-  │       └── main.go
-  ├── internal/             # Private application code (not importable)
-  │   ├── api/              # HTTP handlers
-  │   ├── domain/           # Business logic
-  │   └── repository/       # Data access
-  ├── pkg/                  # Public libraries (importable by others)
-  │   ├── chunking/
-  │   ├── gitrepo/
-  │   └── qdrant/
-  ├── config/               # Configuration
-  ├── db/                   # Database schemas and queries
-  ├── docs/                 # Documentation
-  └── scripts/              # Build and utility scripts
-  ```
+- [x] **Added retry logic to database operations** (in `db/tx.go`):
+  - `db.Query`, `db.Query1`, `db.Tx`, `db.Tx1` now have automatic retry
+  - Uses `pgconn.SafeToRetry()` plus specific error codes (serialization_failure, deadlock_detected, connection errors)
+  - Simple exponential backoff (10ms base, 3 attempts)
 
-- [ ] **Decide on internal vs pkg** (defer to Phase 1):
-  - `internal/` for application-specific code
-  - `pkg/` only if libraries should be importable
+- [x] **Moved libs/ to pkg/**:
+  - `libs/logger/` → `pkg/logger/`
 
-- [ ] **Rename directories** (defer to Phase 1):
-  - `domains/` → `internal/domain/`
+- [x] **Moved to internal/**:
   - `api/` → `internal/api/`
-  - `libs/` → `pkg/` or `internal/pkg/`
+  - `domains/` → `internal/domains/`
 
 ---
 
@@ -79,10 +65,12 @@ Phase 0 cleanup completed. The codebase is now minimal and ready for Phase 1.
 ### What was removed:
 
 **Infrastructure:**
+
 - Milvus dependency (etcd, minio, milvus containers)
 - docker-compose.yml simplified to just PostgreSQL
 
 **Code:**
+
 - `cmds/` directory (duplicate of `cmd/`)
 - `libs/milvus/` (switching to Qdrant)
 - `libs/chunking/`, `libs/openai/`, `libs/gitrepo/` (will rebuild in Phase 2)
@@ -95,23 +83,27 @@ Phase 0 cleanup completed. The codebase is now minimal and ready for Phase 1.
 ```
 semantix/
 ├── cmd/api/main.go           # Entry point
-├── api/
-│   ├── run.go                # Server setup + middleware
-│   ├── health/               # Health check endpoint
-│   └── web/                  # Context helpers
-├── domains/
-│   └── workspaces/           # Example domain (CRUD pattern)
-├── libs/
-│   └── logger/               # Zap logger setup
+├── internal/
+│   ├── api/                  # HTTP handlers
+│   │   ├── run.go            # Server setup + middleware
+│   │   ├── health/           # Health check endpoint
+│   │   └── web/              # Context helpers
+│   └── domains/
+│       └── workspaces/       # Example domain (CRUD pattern)
+├── pkg/
+│   ├── logger/               # Zap logger setup
+│   └── pgconv/               # PostgreSQL type conversions
 ├── config/                   # Configuration
-├── db/                       # Database (sqlc generated)
+├── db/                       # Database (sqlc generated, with retry)
 ├── docs/                     # Documentation
 └── docker-compose.yml        # PostgreSQL only
 ```
 
-The `domains/workspaces/` is kept as a template showing:
+The `internal/domains/workspaces/` is kept as a template showing:
+
 - Models with JSON tags
 - CRUD operations (Create, GetByID, List, Update, Delete)
 - Error handling (ErrNotFound, ErrAlreadyExists)
 - Pagination pattern
-- Database helper usage (db.Query, db.Query1)
+- Database helper usage (db.Query, db.Query1) with automatic retry
+- Using pkg/pgconv for type conversions

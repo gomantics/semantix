@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/gomantics/semantix/api"
+	"github.com/gomantics/semantix/internal/api"
 	"github.com/gomantics/semantix/db"
-	"github.com/gomantics/semantix/libs/logger"
+	"github.com/gomantics/semantix/pkg/logger"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"

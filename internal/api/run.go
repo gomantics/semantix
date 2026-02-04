@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gomantics/semantix/api/health"
+	"github.com/gomantics/semantix/internal/api/health"
 	"github.com/gomantics/semantix/config"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"

@@ -1,7 +1,7 @@
 package health
 
 import (
-	"github.com/gomantics/semantix/api/web"
+	"github.com/gomantics/semantix/internal/api/web"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )

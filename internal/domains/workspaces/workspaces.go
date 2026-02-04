@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/gomantics/semantix/db"
+	"github.com/gomantics/semantix/pkg/pgconv"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var (
@@ -16,17 +16,7 @@ var (
 	ErrAlreadyExists = errors.New("workspace with this slug already exists")
 )
 
-// Create creates a new workspace
 func Create(ctx context.Context, params CreateParams) (*Workspace, error) {
-	// Check if slug already exists
-	_, err := GetBySlug(ctx, params.Slug)
-	if err == nil {
-		return nil, ErrAlreadyExists
-	}
-	if !errors.Is(err, ErrNotFound) {
-		return nil, err
-	}
-
 	now := time.Now().UnixNano()
 	settings := params.Settings
 	if settings == nil {
@@ -37,11 +27,19 @@ func Create(ctx context.Context, params CreateParams) (*Workspace, error) {
 		return nil, err
 	}
 
-	dbWorkspace, err := db.Query1(ctx, func(q *db.Queries) (db.Workspace, error) {
+	dbWorkspace, err := db.Tx1(ctx, func(q *db.Queries) (db.Workspace, error) {
+		_, err := q.GetWorkspaceBySlug(ctx, params.Slug)
+		if err == nil {
+			return db.Workspace{}, ErrAlreadyExists
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return db.Workspace{}, err
+		}
+
 		return q.CreateWorkspace(ctx, db.CreateWorkspaceParams{
 			Name:        params.Name,
 			Slug:        params.Slug,
-			Description: toPgText(params.Description),
+			Description: pgconv.ToText(params.Description),
 			Settings:    settingsJSON,
 			Created:     now,
 			Updated:     now,
@@ -54,7 +52,6 @@ func Create(ctx context.Context, params CreateParams) (*Workspace, error) {
 	return toWorkspace(dbWorkspace), nil
 }
 
-// GetByID retrieves a workspace by ID
 func GetByID(ctx context.Context, id int64) (*Workspace, error) {
 	dbWorkspace, err := db.Query1(ctx, func(q *db.Queries) (db.Workspace, error) {
 		return q.GetWorkspaceByID(ctx, id)
@@ -68,7 +65,6 @@ func GetByID(ctx context.Context, id int64) (*Workspace, error) {
 	return toWorkspace(dbWorkspace), nil
 }
 
-// GetBySlug retrieves a workspace by slug
 func GetBySlug(ctx context.Context, slug string) (*Workspace, error) {
 	dbWorkspace, err := db.Query1(ctx, func(q *db.Queries) (db.Workspace, error) {
 		return q.GetWorkspaceBySlug(ctx, slug)
@@ -88,44 +84,40 @@ func List(ctx context.Context, params ListParams) (*ListResult, error) {
 		params.Limit = 20
 	}
 
-	var dbWorkspaces []db.Workspace
-	var total int64
+	type listData struct {
+		workspaces []db.Workspace
+		total      int64
+	}
 
-	err := db.Query(ctx, func(q *db.Queries) error {
-		var err error
-		dbWorkspaces, err = q.ListWorkspaces(ctx, db.ListWorkspacesParams{
+	data, err := db.Tx1(ctx, func(q *db.Queries) (listData, error) {
+		dbWorkspaces, err := q.ListWorkspaces(ctx, db.ListWorkspacesParams{
 			Limit:  int32(params.Limit),
 			Offset: int32(params.Offset),
 		})
 		if err != nil {
-			return err
+			return listData{}, err
 		}
-		total, err = q.CountWorkspaces(ctx)
-		return err
+
+		total, err := q.CountWorkspaces(ctx)
+		if err != nil {
+			return listData{}, err
+		}
+
+		return listData{workspaces: dbWorkspaces, total: total}, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	workspaces := make([]Workspace, len(dbWorkspaces))
-	for i, dbWs := range dbWorkspaces {
+	workspaces := make([]Workspace, len(data.workspaces))
+	for i, dbWs := range data.workspaces {
 		workspaces[i] = *toWorkspace(dbWs)
 	}
 
-	return &ListResult{Workspaces: workspaces, Total: total}, nil
+	return &ListResult{Workspaces: workspaces, Total: data.total}, nil
 }
 
-// Update updates a workspace
 func Update(ctx context.Context, id int64, params UpdateParams) (*Workspace, error) {
-	// Check if new slug conflicts with another workspace
-	existing, err := GetBySlug(ctx, params.Slug)
-	if err == nil && existing.ID != id {
-		return nil, ErrAlreadyExists
-	}
-	if err != nil && !errors.Is(err, ErrNotFound) {
-		return nil, err
-	}
-
 	now := time.Now().UnixNano()
 	settings := params.Settings
 	if settings == nil {
@@ -136,12 +128,20 @@ func Update(ctx context.Context, id int64, params UpdateParams) (*Workspace, err
 		return nil, err
 	}
 
-	dbWorkspace, err := db.Query1(ctx, func(q *db.Queries) (db.Workspace, error) {
+	dbWorkspace, err := db.Tx1(ctx, func(q *db.Queries) (db.Workspace, error) {
+		existing, err := q.GetWorkspaceBySlug(ctx, params.Slug)
+		if err == nil && existing.ID != id {
+			return db.Workspace{}, ErrAlreadyExists
+		}
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return db.Workspace{}, err
+		}
+
 		return q.UpdateWorkspace(ctx, db.UpdateWorkspaceParams{
 			ID:          id,
 			Name:        params.Name,
 			Slug:        params.Slug,
-			Description: toPgText(params.Description),
+			Description: pgconv.ToText(params.Description),
 			Settings:    settingsJSON,
 			Updated:     now,
 		})
@@ -156,24 +156,21 @@ func Update(ctx context.Context, id int64, params UpdateParams) (*Workspace, err
 	return toWorkspace(dbWorkspace), nil
 }
 
-// Delete removes a workspace by ID
 func Delete(ctx context.Context, id int64) error {
-	_, err := GetByID(ctx, id)
-	if err != nil {
-		return err
-	}
+	return db.Tx(ctx, func(q *db.Queries) error {
+		_, err := q.GetWorkspaceByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
 
-	return db.Query(ctx, func(q *db.Queries) error {
 		return q.DeleteWorkspace(ctx, id)
 	})
 }
 
 func toWorkspace(dbWorkspace db.Workspace) *Workspace {
-	var description *string
-	if dbWorkspace.Description.Valid {
-		description = &dbWorkspace.Description.String
-	}
-
 	var settings map[string]any
 	if len(dbWorkspace.Settings) > 0 {
 		_ = json.Unmarshal(dbWorkspace.Settings, &settings)
@@ -186,16 +183,9 @@ func toWorkspace(dbWorkspace db.Workspace) *Workspace {
 		ID:          dbWorkspace.ID,
 		Name:        dbWorkspace.Name,
 		Slug:        dbWorkspace.Slug,
-		Description: description,
+		Description: pgconv.FromText(dbWorkspace.Description),
 		Settings:    settings,
 		Created:     dbWorkspace.Created,
 		Updated:     dbWorkspace.Updated,
 	}
-}
-
-func toPgText(s *string) pgtype.Text {
-	if s == nil {
-		return pgtype.Text{Valid: false}
-	}
-	return pgtype.Text{String: *s, Valid: true}
 }

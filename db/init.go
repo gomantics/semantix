@@ -72,55 +72,6 @@ func GetPool() *pgxpool.Pool {
 	return defaultPool
 }
 
-// Query runs fn with a Queries instance (can add retries here later)
-func Query(ctx context.Context, fn func(*Queries) error) error {
-	// TODO: add retry logic here
-	return fn(New(defaultPool))
-}
-
-// Query1 runs fn and returns a single result
-func Query1[T any](ctx context.Context, fn func(*Queries) (T, error)) (T, error) {
-	// TODO: add retry logic here
-	return fn(New(defaultPool))
-}
-
-// Tx runs fn within a transaction (can add retries here later)
-func Tx(ctx context.Context, fn func(*Queries) error) error {
-	// TODO: add retry logic here
-	tx, err := defaultPool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	if err := fn(New(tx)); err != nil {
-		return err
-	}
-
-	return tx.Commit(ctx)
-}
-
-// Tx1 runs fn within a transaction and returns a result
-func Tx1[T any](ctx context.Context, fn func(*Queries) (T, error)) (T, error) {
-	// TODO: add retry logic here
-	var zero T
-	tx, err := defaultPool.Begin(ctx)
-	if err != nil {
-		return zero, err
-	}
-	defer tx.Rollback(ctx)
-
-	result, err := fn(New(tx))
-	if err != nil {
-		return zero, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return zero, err
-	}
-	return result, nil
-}
-
 // ApplySchema applies all SQL schema files
 func ApplySchema(ctx context.Context, l *zap.Logger) error {
 	if defaultPool == nil {
