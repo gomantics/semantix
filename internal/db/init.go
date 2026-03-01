@@ -2,11 +2,7 @@ package db
 
 import (
 	"context"
-	"embed"
 	"fmt"
-	"io/fs"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/gomantics/semantix/config"
@@ -15,12 +11,12 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:embed schema/*.sql
-var embedSchema embed.FS
-
 var defaultPool *pgxpool.Pool
 
-// Init initializes the database connection pool and applies schema
+// Init initializes the database connection pool.
+//
+// Schema migrations are not run here. Run `go run ./cmd/migrate up` before
+// starting the service to apply any pending migrations.
 func Init(lc fx.Lifecycle, l *zap.Logger) error {
 	ctx := context.Background()
 
@@ -29,7 +25,6 @@ func Init(lc fx.Lifecycle, l *zap.Logger) error {
 		return fmt.Errorf("failed to parse database config: %w", err)
 	}
 
-	// Connection pool settings
 	poolConfig.MaxConns = 50
 	poolConfig.MinConns = 5
 	poolConfig.MaxConnLifetime = 30 * time.Minute
@@ -41,7 +36,6 @@ func Init(lc fx.Lifecycle, l *zap.Logger) error {
 		return fmt.Errorf("failed to create connection pool: %w", err)
 	}
 
-	// Test connection
 	if err := defaultPool.Ping(ctx); err != nil {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
@@ -57,86 +51,10 @@ func Init(lc fx.Lifecycle, l *zap.Logger) error {
 	})
 
 	l.Info("database pool initialized")
-
-	// Apply schema
-	if err := ApplySchema(ctx, l); err != nil {
-		return fmt.Errorf("failed to apply schema: %w", err)
-	}
-
-	l.Info("database schema applied")
 	return nil
 }
 
-// GetPool returns the default connection pool
+// GetPool returns the default connection pool.
 func GetPool() *pgxpool.Pool {
 	return defaultPool
-}
-
-// ApplySchema applies all SQL schema files
-func ApplySchema(ctx context.Context, l *zap.Logger) error {
-	if defaultPool == nil {
-		return fmt.Errorf("pool not initialized")
-	}
-
-	// Get all SQL files from embedded schema
-	sqlFiles, err := getSchemaSQLFiles()
-	if err != nil {
-		return err
-	}
-
-	l.Info("found schema files", zap.Strings("files", sqlFiles))
-
-	// Acquire a connection for schema operations
-	conn, err := defaultPool.Acquire(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to acquire connection: %w", err)
-	}
-	defer conn.Release()
-
-	// Execute each SQL file
-	for _, filename := range sqlFiles {
-		filePath := "schema/" + filename
-
-		l.Info("executing schema file", zap.String("file", filename))
-
-		content, err := embedSchema.ReadFile(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to read schema file %s: %w", filename, err)
-		}
-
-		_, err = conn.Exec(ctx, string(content))
-		if err != nil {
-			return fmt.Errorf("failed to execute schema %s: %w", filename, err)
-		}
-
-		l.Info("schema file executed", zap.String("file", filename))
-	}
-
-	return nil
-}
-
-// getSchemaSQLFiles returns sorted list of SQL files from embedded schema
-func getSchemaSQLFiles() ([]string, error) {
-	fsys, err := fs.Sub(embedSchema, "schema")
-	if err != nil {
-		return nil, err
-	}
-
-	entries, err := fs.ReadDir(fsys, ".")
-	if err != nil {
-		return nil, err
-	}
-
-	var sqlFiles []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		if strings.HasSuffix(entry.Name(), ".sql") {
-			sqlFiles = append(sqlFiles, entry.Name())
-		}
-	}
-
-	sort.Strings(sqlFiles)
-	return sqlFiles, nil
 }
