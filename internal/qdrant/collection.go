@@ -40,6 +40,7 @@ func EnsureCollection(ctx context.Context, l *zap.Logger) error {
 				Params: &pb.VectorParams{
 					Size:     VectorSize,
 					Distance: pb.Distance_Cosine,
+					OnDisk:   boolPtr(true),
 				},
 			},
 		},
@@ -87,6 +88,8 @@ func createPayloadIndexes(ctx context.Context, collectionName string, l *zap.Log
 		{"workspace_id", pb.FieldType_FieldTypeInteger},
 		{"repo_id", pb.FieldType_FieldTypeInteger},
 		{"file_id", pb.FieldType_FieldTypeInteger},
+		{"language", pb.FieldType_FieldTypeKeyword},
+		{"file_path", pb.FieldType_FieldTypeKeyword},
 	}
 
 	for _, idx := range indexes {
