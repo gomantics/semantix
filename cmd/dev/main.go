@@ -16,7 +16,7 @@ func main() {
 			logger.New,
 		),
 		fx.Decorate(func(l *zap.Logger) *zap.Logger {
-			return l.With(zap.String("service", "semantix"))
+			return l.With(zap.String("service", "dev"))
 		}),
 		fx.Invoke(
 			db.Init,

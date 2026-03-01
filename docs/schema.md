@@ -52,30 +52,30 @@ CREATE TABLE repos (
     id              BIGSERIAL PRIMARY KEY,
     workspace_id    BIGINT NOT NULL,
     git_token_id    BIGINT,                  -- nullable
-    
+
     -- Identity
     url             TEXT NOT NULL,
     provider        TEXT NOT NULL,           -- github, gitlab, bitbucket
     owner           TEXT NOT NULL,
     name            TEXT NOT NULL,
-    
+
     -- Queue status: pending, cloning, indexing, completed, failed
     -- Cron picks up 'pending' every 60s
     status          TEXT NOT NULL DEFAULT 'pending',
     error_message   TEXT,
-    
+
     -- Git state (from last successful index)
     default_branch  TEXT,
     head_commit     TEXT,
-    
+
     -- Latest stats (denormalized from last index_run)
     file_count      INT NOT NULL DEFAULT 0,
     chunk_count     INT NOT NULL DEFAULT 0,
     indexed_at      BIGINT,
-    
+
     created         BIGINT NOT NULL,
     updated         BIGINT NOT NULL,
-    
+
     UNIQUE(workspace_id, url)
 );
 
@@ -90,19 +90,19 @@ CREATE INDEX idx_repos_queue ON repos(status, created) WHERE status = 'pending';
 CREATE TABLE files (
     id              BIGSERIAL PRIMARY KEY,
     repo_id         BIGINT NOT NULL,
-    
+
     path            TEXT NOT NULL,
     content_hash    TEXT NOT NULL,           -- SHA-256 of file content
-    
+
     language        TEXT,
     size_bytes      BIGINT NOT NULL,
     line_count      INT,
     chunk_count     INT NOT NULL DEFAULT 0,
-    
+
     indexed_at      BIGINT,
     created         BIGINT NOT NULL,
     updated         BIGINT NOT NULL,
-    
+
     UNIQUE(repo_id, path)
 );
 
@@ -117,7 +117,7 @@ CREATE TABLE embedding_cache (
     content_hash    TEXT PRIMARY KEY,        -- SHA-256 of chunk content
     embedding       BYTEA NOT NULL,          -- packed float32 array
     model           TEXT NOT NULL,
-    
+
     use_count       INT NOT NULL DEFAULT 1,
     last_used       BIGINT NOT NULL,
     created         BIGINT NOT NULL
@@ -133,35 +133,35 @@ CREATE INDEX idx_cache_model ON embedding_cache(model);
 CREATE TABLE index_runs (
     id              BIGSERIAL PRIMARY KEY,
     repo_id         BIGINT NOT NULL,
-    
+
     -- Status: running, completed, failed
     status          TEXT NOT NULL DEFAULT 'running',
     error_message   TEXT,
-    
+
     -- Git snapshot
     from_commit     TEXT,                    -- previous HEAD (null on first index)
     to_commit       TEXT,                    -- current HEAD we indexed
     commit_message  TEXT,                    -- message of to_commit
     branch          TEXT,
     commits_between INT NOT NULL DEFAULT 0,  -- commits skipped (from_commit..to_commit)
-    
+
     -- Stats
     files_total     INT NOT NULL DEFAULT 0,
     files_added     INT NOT NULL DEFAULT 0,
     files_changed   INT NOT NULL DEFAULT 0,
     files_deleted   INT NOT NULL DEFAULT 0,
     chunks_created  INT NOT NULL DEFAULT 0,
-    
+
     -- Embedding stats
     cache_hits      INT NOT NULL DEFAULT 0,
     cache_misses    INT NOT NULL DEFAULT 0,
     tokens_used     BIGINT NOT NULL DEFAULT 0,  -- actual tokens sent to OpenAI
-    
+
     -- Timing
     started_at      BIGINT NOT NULL,
     completed_at    BIGINT,
     duration_ms     BIGINT,
-    
+
     created         BIGINT NOT NULL
 );
 
@@ -173,9 +173,11 @@ CREATE INDEX idx_runs_repo ON index_runs(repo_id, created DESC);
 
 ## Qdrant Collection
 
+Collection: `semantix_chunks` (configurable via `CONFIG_QDRANT_COLLECTION_NAME`)
+
 ```json
 {
-  "collection_name": "chunks",
+  "collection_name": "semantix_chunks",
   "vectors_config": {
     "size": 1536,
     "distance": "Cosine"
@@ -183,31 +185,41 @@ CREATE INDEX idx_runs_repo ON index_runs(repo_id, created DESC);
 }
 ```
 
+### Point ID
+
+Each chunk is stored as a Qdrant point. The **point ID** (UUID) serves as the chunk's unique identifier - no separate `chunk_id` payload field needed.
+
 ### Payload Schema
 
-| Field | Type | Indexed | Description |
-|-------|------|---------|-------------|
-| `workspace_id` | integer | yes | Multi-tenant filtering |
-| `repo_id` | integer | yes | Filter by repo |
-| `file_id` | integer | yes | For deletion on file change |
-| `file_path` | keyword | yes | Filter by path patterns |
-| `language` | keyword | yes | Filter by language |
-| `content` | text | no | Chunk text content |
-| `content_hash` | keyword | no | SHA-256 of chunk |
-| `chunk_index` | integer | no | Order within file |
-| `start_line` | integer | no | Start line number |
-| `end_line` | integer | no | End line number |
+| Field          | Type    | Indexed | Description                         |
+| -------------- | ------- | ------- | ----------------------------------- |
+| `workspace_id` | integer | yes     | Multi-tenant filtering              |
+| `repo_id`      | integer | yes     | Filter by repo                      |
+| `file_id`      | integer | yes     | Delete chunks when file changes     |
+| `file_path`    | keyword | no      | Path for display/navigation         |
+| `language`     | keyword | no      | Language for display                |
+| `content`      | text    | no      | Chunk text content                  |
+| `content_hash` | keyword | no      | SHA-256 of chunk (for cache lookup) |
+| `chunk_index`  | integer | no      | Order within file (0, 1, 2...)      |
+| `start_line`   | integer | no      | Start line number                   |
+| `end_line`     | integer | no      | End line number                     |
 
-### Create Indexes
+### Payload Indexes
+
+Created automatically on collection init (see `internal/qdrant/collection.go`):
 
 ```go
-// Required payload indexes for filtering
-client.CreatePayloadIndex("chunks", "workspace_id", qdrant.PayloadSchemaType_Integer)
-client.CreatePayloadIndex("chunks", "repo_id", qdrant.PayloadSchemaType_Integer)
-client.CreatePayloadIndex("chunks", "file_id", qdrant.PayloadSchemaType_Integer)
-client.CreatePayloadIndex("chunks", "file_path", qdrant.PayloadSchemaType_Keyword)
-client.CreatePayloadIndex("chunks", "language", qdrant.PayloadSchemaType_Keyword)
+indexes := []struct {
+    fieldName string
+    fieldType pb.FieldType
+}{
+    {"workspace_id", pb.FieldType_FieldTypeInteger},
+    {"repo_id", pb.FieldType_FieldTypeInteger},
+    {"file_id", pb.FieldType_FieldTypeInteger},
+}
 ```
+
+> **Note:** `file_path` and `language` indexes can be added later if path/language filtering becomes a common search pattern.
 
 ---
 
@@ -226,7 +238,7 @@ SELECT id, path, content_hash FROM files WHERE repo_id = $1;
 -- App fetches all files, compares with disk hashes in memory
 
 -- Check embedding cache (batch)
-SELECT content_hash, embedding FROM embedding_cache 
+SELECT content_hash, embedding FROM embedding_cache
 WHERE content_hash = ANY($1);
 
 -- Insert/update cache entry
@@ -237,9 +249,9 @@ ON CONFLICT (content_hash) DO UPDATE SET
     last_used = $4;
 
 -- LRU cache eviction (delete oldest 10%)
-DELETE FROM embedding_cache 
+DELETE FROM embedding_cache
 WHERE content_hash IN (
-    SELECT content_hash FROM embedding_cache 
+    SELECT content_hash FROM embedding_cache
     ORDER BY last_used LIMIT $1
 );
 ```
@@ -279,25 +291,25 @@ client.Delete("chunks", &qdrant.PointsSelector{
 func ProcessQueue(ctx context.Context) {
     // Pick one pending repo (FIFO)
     repo := db.Query(`
-        SELECT * FROM repos 
-        WHERE status = 'pending' 
-        ORDER BY created 
+        SELECT * FROM repos
+        WHERE status = 'pending'
+        ORDER BY created
         LIMIT 1 FOR UPDATE SKIP LOCKED
     `)
-    
+
     if repo == nil {
         return // nothing to process
     }
-    
+
     // Mark as indexing
     db.Exec(`UPDATE repos SET status = 'indexing' WHERE id = $1`, repo.ID)
-    
+
     // Create index run record
     runID := db.Insert(`INSERT INTO index_runs (repo_id, status, started_at, created) ...`)
-    
+
     // Do the indexing
     err := indexRepo(ctx, repo, runID)
-    
+
     // Update status based on result
     if err != nil {
         db.Exec(`UPDATE repos SET status = 'failed', error_message = $2 WHERE id = $1`, repo.ID, err)
@@ -320,7 +332,7 @@ func ProcessQueue(ctx context.Context) {
 6. Walk files, compute SHA-256 for each
 7. Compare with files table:
    - added: new paths
-   - changed: hash mismatch  
+   - changed: hash mismatch
    - deleted: in DB but not on disk
 6. For added/changed files:
    a. Chunk with tree-sitter
@@ -399,6 +411,7 @@ Estimate tokens before indexing.
 ```
 
 **How it works:**
+
 1. Clone/pull repo (or use existing clone)
 2. Count indexable files (skip non-indexable)
 3. Chunk files, count tokens with `tiktoken-go` (`cl100k_base`)
@@ -407,19 +420,20 @@ Estimate tokens before indexing.
 
 **Skipped files:**
 
-| Category | Patterns |
-|----------|----------|
-| **Dependencies** | `node_modules/`, `vendor/`, `.venv/`, `venv/`, `__pycache__/` |
-| **Build outputs** | `dist/`, `build/`, `out/`, `.next/`, `target/`, `bin/` |
-| **Git** | `.git/` |
-| **IDE** | `.idea/`, `.vscode/`, `*.swp`, `.DS_Store` |
-| **Lock files** | `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `Gemfile.lock`, `poetry.lock`, `Cargo.lock` |
-| **Generated** | `*.min.js`, `*.min.css`, `*.map`, `*.pb.go`, `*.generated.*` |
-| **Binary** | `*.png`, `*.jpg`, `*.gif`, `*.ico`, `*.woff`, `*.ttf`, `*.pdf`, `*.zip`, `*.tar`, `*.exe`, `*.dll`, `*.so`, `*.dylib` |
-| **Data** | `*.sql`, `*.csv` (large), `*.parquet`, `*.sqlite` |
-| **Snapshots** | `__snapshots__/`, `*.snap` |
+| Category          | Patterns                                                                                                              |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Dependencies**  | `node_modules/`, `vendor/`, `.venv/`, `venv/`, `__pycache__/`                                                         |
+| **Build outputs** | `dist/`, `build/`, `out/`, `.next/`, `target/`, `bin/`                                                                |
+| **Git**           | `.git/`                                                                                                               |
+| **IDE**           | `.idea/`, `.vscode/`, `*.swp`, `.DS_Store`                                                                            |
+| **Lock files**    | `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `Gemfile.lock`, `poetry.lock`, `Cargo.lock`                       |
+| **Generated**     | `*.min.js`, `*.min.css`, `*.map`, `*.pb.go`, `*.generated.*`                                                          |
+| **Binary**        | `*.png`, `*.jpg`, `*.gif`, `*.ico`, `*.woff`, `*.ttf`, `*.pdf`, `*.zip`, `*.tar`, `*.exe`, `*.dll`, `*.so`, `*.dylib` |
+| **Data**          | `*.sql`, `*.csv` (large), `*.parquet`, `*.sqlite`                                                                     |
+| **Snapshots**     | `__snapshots__/`, `*.snap`                                                                                            |
 
 **Configurable via `workspaces.settings`:**
+
 ```json
 {
   "exclude_patterns": ["docs/", "*.test.ts"],
@@ -477,6 +491,7 @@ Estimate tokens before indexing.
 ```
 
 **UI can show:**
+
 - "Indexed abc1234 (feat: add user auth) - skipped 9 commits"
 - "First index: def5678 (fix: login bug) - 339 files"
 
@@ -484,14 +499,14 @@ Estimate tokens before indexing.
 
 ## Storage Estimates
 
-| Table | 100 repos × 10k files | Notes |
-|-------|----------------------|-------|
-| workspaces | < 1 KB | Negligible |
-| repos | < 10 KB | Negligible |
-| files | ~50 MB | 1M files × 50 bytes/row |
-| embedding_cache | ~3 GB | 500k chunks × 6KB embedding |
+| Table           | 100 repos × 10k files | Notes                       |
+| --------------- | --------------------- | --------------------------- |
+| workspaces      | < 1 KB                | Negligible                  |
+| repos           | < 10 KB               | Negligible                  |
+| files           | ~50 MB                | 1M files × 50 bytes/row     |
+| embedding_cache | ~3 GB                 | 500k chunks × 6KB embedding |
 
-| Qdrant | 500k chunks | Notes |
-|--------|-------------|-------|
-| Vectors | ~3 GB | 1536 dim × 4 bytes × 500k |
-| Payloads | ~500 MB | Content + metadata |
+| Qdrant   | 500k chunks | Notes                     |
+| -------- | ----------- | ------------------------- |
+| Vectors  | ~3 GB       | 1536 dim × 4 bytes × 500k |
+| Payloads | ~500 MB     | Content + metadata        |
