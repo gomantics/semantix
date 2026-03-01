@@ -51,8 +51,26 @@ CREATE TABLE IF NOT EXISTS files (
 CREATE INDEX IF NOT EXISTS idx_files_repo_id ON files(repo_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_files_repo_path ON files(repo_id, path);
 
+CREATE TABLE IF NOT EXISTS index_runs (
+  id                   BIGSERIAL PRIMARY KEY,
+  repo_id              BIGINT NOT NULL,
+  status               TEXT NOT NULL,     -- running, completed, failed
+  started_at           BIGINT NOT NULL,   -- nanoseconds since epoch
+  completed_at         BIGINT,            -- nanoseconds since epoch
+  files_processed      INT NOT NULL DEFAULT 0,
+  chunks_created       INT NOT NULL DEFAULT 0,
+  embeddings_generated INT NOT NULL DEFAULT 0,
+  embeddings_cached    INT NOT NULL DEFAULT 0,
+  error_message        TEXT,
+  duration_ms          BIGINT
+);
+
+CREATE INDEX IF NOT EXISTS idx_index_runs_repo_id ON index_runs(repo_id);
+CREATE INDEX IF NOT EXISTS idx_index_runs_status ON index_runs(status);
+
 -- +goose Down
--- Drop in reverse dependency order (repos/files reference workspaces/git_tokens).
+-- Drop in reverse dependency order.
+DROP TABLE IF EXISTS index_runs;
 DROP TABLE IF EXISTS files;
 DROP TABLE IF EXISTS repos;
 DROP TABLE IF EXISTS git_tokens;
