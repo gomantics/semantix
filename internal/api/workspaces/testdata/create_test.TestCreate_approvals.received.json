@@ -1,0 +1,17 @@
+{
+  "created": "[SCRUBBED]",
+  "id": "[SCRUBBED]",
+  "name": "[SCRUBBED]",
+  "settings": {
+    "exclude_patterns": [
+      "node_modules/",
+      "vendor/",
+      ".git/",
+      "*.lock",
+      "*.min.js",
+      "dist/",
+      "build/"
+    ]
+  },
+  "updated": "[SCRUBBED]"
+}

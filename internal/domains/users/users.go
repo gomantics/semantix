@@ -3,9 +3,11 @@ package users
 import (
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/gomantics/semantix/internal/db"
@@ -14,6 +16,39 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
+
+var (
+	randomAdjectives = []string{
+		"Amber", "Arctic", "Azure", "Bold", "Bright", "Calm", "Cosmic", "Crimson",
+		"Crystal", "Dark", "Dawn", "Deep", "Divine", "Dusk", "Ember", "Epic",
+		"Fierce", "Frosty", "Gilded", "Glacial", "Golden", "Grand", "Iron", "Jade",
+		"Lunar", "Mighty", "Mystic", "Noble", "Obsidian", "Onyx", "Opal", "Phantom",
+		"Polar", "Primal", "Proud", "Radiant", "Royal", "Ruby", "Sacred", "Savage",
+		"Shadow", "Silent", "Silver", "Solar", "Starlit", "Steel", "Storm", "Swift",
+		"Timeless", "Titan", "Twilight", "Vast", "Velvet", "Vivid", "Wild", "Wise",
+	}
+	randomAnimals = []string{
+		"Badger", "Bear", "Bison", "Condor", "Cougar", "Crane", "Crow", "Dingo",
+		"Dragon", "Eagle", "Falcon", "Fox", "Grizzly", "Hawk", "Heron", "Jaguar",
+		"Kestrel", "Kodiak", "Leopard", "Lion", "Lynx", "Mammoth", "Mantis", "Marlin",
+		"Mink", "Moose", "Narwhal", "Osprey", "Otter", "Owl", "Panther", "Pegasus",
+		"Phoenix", "Puma", "Raven", "Rhino", "Sabre", "Salmon", "Scorpion", "Shark",
+		"Snow Leopard", "Stallion", "Tiger", "Timber Wolf", "Viper", "Walrus",
+		"Weasel", "Wolf", "Wolverine", "Wren",
+	}
+)
+
+func randomWorkspaceName() string {
+	var buf [8]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "Default"
+	}
+	hi := binary.BigEndian.Uint32(buf[:4])
+	lo := binary.BigEndian.Uint32(buf[4:])
+	adj := randomAdjectives[hi%uint32(len(randomAdjectives))]
+	animal := randomAnimals[lo%uint32(len(randomAnimals))]
+	return fmt.Sprintf("%s %s", adj, animal)
+}
 
 var (
 	ErrNotFound        = errors.New("user not found")
@@ -147,7 +182,7 @@ func Signup(ctx context.Context, params CreateParams) (*SignupResult, error) {
 		}
 
 		_, err = q.CreateWorkspace(ctx, db.CreateWorkspaceParams{
-			Name:        "Default",
+			Name:        randomWorkspaceName(),
 			Description: pgtype.Text{Valid: false},
 			Settings:    defaultSettings,
 			Created:     now,
