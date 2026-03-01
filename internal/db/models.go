@@ -19,11 +19,12 @@ type File struct {
 }
 
 type GitToken struct {
-	ID             int64  `json:"id"`
-	Name           string `json:"name"`
-	Provider       string `json:"provider"`
-	TokenEncrypted []byte `json:"token_encrypted"`
-	Created        int64  `json:"created"`
+	ID             int64       `json:"id"`
+	Name           string      `json:"name"`
+	Provider       string      `json:"provider"`
+	TokenEncrypted []byte      `json:"token_encrypted"`
+	TokenHint      pgtype.Text `json:"token_hint"`
+	Created        int64       `json:"created"`
 }
 
 type Repo struct {

@@ -22,14 +22,22 @@ type CreateGitTokenParams struct {
 	Created        int64  `json:"created"`
 }
 
-func (q *Queries) CreateGitToken(ctx context.Context, arg CreateGitTokenParams) (GitToken, error) {
+type CreateGitTokenRow struct {
+	ID             int64  `json:"id"`
+	Name           string `json:"name"`
+	Provider       string `json:"provider"`
+	TokenEncrypted []byte `json:"token_encrypted"`
+	Created        int64  `json:"created"`
+}
+
+func (q *Queries) CreateGitToken(ctx context.Context, arg CreateGitTokenParams) (CreateGitTokenRow, error) {
 	row := q.db.QueryRow(ctx, createGitToken,
 		arg.Name,
 		arg.Provider,
 		arg.TokenEncrypted,
 		arg.Created,
 	)
-	var i GitToken
+	var i CreateGitTokenRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -56,9 +64,17 @@ FROM git_tokens
 WHERE id = $1
 `
 
-func (q *Queries) GetGitTokenByID(ctx context.Context, id int64) (GitToken, error) {
+type GetGitTokenByIDRow struct {
+	ID             int64  `json:"id"`
+	Name           string `json:"name"`
+	Provider       string `json:"provider"`
+	TokenEncrypted []byte `json:"token_encrypted"`
+	Created        int64  `json:"created"`
+}
+
+func (q *Queries) GetGitTokenByID(ctx context.Context, id int64) (GetGitTokenByIDRow, error) {
 	row := q.db.QueryRow(ctx, getGitTokenByID, id)
-	var i GitToken
+	var i GetGitTokenByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -75,15 +91,23 @@ FROM git_tokens
 ORDER BY created DESC
 `
 
-func (q *Queries) ListGitTokens(ctx context.Context) ([]GitToken, error) {
+type ListGitTokensRow struct {
+	ID             int64  `json:"id"`
+	Name           string `json:"name"`
+	Provider       string `json:"provider"`
+	TokenEncrypted []byte `json:"token_encrypted"`
+	Created        int64  `json:"created"`
+}
+
+func (q *Queries) ListGitTokens(ctx context.Context) ([]ListGitTokensRow, error) {
 	rows, err := q.db.Query(ctx, listGitTokens)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GitToken
+	var items []ListGitTokensRow
 	for rows.Next() {
-		var i GitToken
+		var i ListGitTokensRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
@@ -108,15 +132,23 @@ WHERE provider = $1
 ORDER BY created DESC
 `
 
-func (q *Queries) ListGitTokensByProvider(ctx context.Context, provider string) ([]GitToken, error) {
+type ListGitTokensByProviderRow struct {
+	ID             int64  `json:"id"`
+	Name           string `json:"name"`
+	Provider       string `json:"provider"`
+	TokenEncrypted []byte `json:"token_encrypted"`
+	Created        int64  `json:"created"`
+}
+
+func (q *Queries) ListGitTokensByProvider(ctx context.Context, provider string) ([]ListGitTokensByProviderRow, error) {
 	rows, err := q.db.Query(ctx, listGitTokensByProvider, provider)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GitToken
+	var items []ListGitTokensByProviderRow
 	for rows.Next() {
-		var i GitToken
+		var i ListGitTokensByProviderRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
