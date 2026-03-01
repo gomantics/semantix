@@ -90,6 +90,76 @@ func CreateFirst(ctx context.Context, params CreateParams) (*User, error) {
 	return toUser(dbUser), nil
 }
 
+type SignupResult struct {
+	User  *User
+	Token string
+}
+
+// Signup atomically creates the first admin user, a session, and the default
+// workspace in a single transaction. Returns ErrAdminExists if any user exists.
+func Signup(ctx context.Context, params CreateParams) (*SignupResult, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(params.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UnixNano()
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return nil, err
+	}
+	token := hex.EncodeToString(raw)
+
+	result, err := db.Tx1(ctx, func(q *db.Queries) (SignupResult, error) {
+		count, err := q.CountUsers(ctx)
+		if err != nil {
+			return SignupResult{}, err
+		}
+		if count > 0 {
+			return SignupResult{}, ErrAdminExists
+		}
+
+		dbUser, err := q.CreateUser(ctx, db.CreateUserParams{
+			Email:        params.Email,
+			PasswordHash: string(hash),
+			Created:      now,
+			Updated:      now,
+		})
+		if err != nil {
+			return SignupResult{}, err
+		}
+
+		_, err = q.CreateSession(ctx, db.CreateSessionParams{
+			UserID:    dbUser.ID,
+			Token:     token,
+			Created:   now,
+			ExpiresAt: pgtype.Int8{Valid: false},
+		})
+		if err != nil {
+			return SignupResult{}, err
+		}
+
+		_, err = q.CreateWorkspace(ctx, db.CreateWorkspaceParams{
+			Name:        "Default",
+			Slug:        "default",
+			Description: pgtype.Text{Valid: false},
+			Settings:    []byte("{}"),
+			Created:     now,
+			Updated:     now,
+		})
+		if err != nil {
+			return SignupResult{}, err
+		}
+
+		return SignupResult{User: toUser(dbUser), Token: token}, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 func Login(ctx context.Context, email, password string) (*User, error) {
 	dbUser, err := db.Query1(ctx, func(q *db.Queries) (db.User, error) {
 		return q.GetUserByEmail(ctx, email)

@@ -30,7 +30,7 @@ func Signup(c web.Context) error {
 
 	ctx := c.Request().Context()
 
-	user, err := users.CreateFirst(ctx, users.CreateParams{
+	result, err := users.Signup(ctx, users.CreateParams{
 		Email:    req.Email,
 		Password: req.Password,
 	})
@@ -38,21 +38,15 @@ func Signup(c web.Context) error {
 		if errors.Is(err, users.ErrAdminExists) {
 			return c.Error(http.StatusForbidden, "admin user already exists")
 		}
-		c.L.Error("failed to create user", zap.Error(err))
-		return c.InternalError("failed to create user")
+		c.L.Error("failed to sign up", zap.Error(err))
+		return c.InternalError("failed to sign up")
 	}
 
-	token, err := users.CreateSession(ctx, user.ID)
-	if err != nil {
-		c.L.Error("failed to create session", zap.Error(err))
-		return c.InternalError("failed to create session")
-	}
-
-	c.SetCookie(sessionCookie(token))
+	c.SetCookie(sessionCookie(result.Token))
 
 	return c.Created(map[string]any{
-		"id":    user.ID,
-		"email": user.Email,
+		"id":    result.User.ID,
+		"email": result.User.Email,
 	})
 }
 
