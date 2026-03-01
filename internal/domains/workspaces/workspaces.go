@@ -15,9 +15,11 @@ var ErrNotFound = errors.New("workspace not found")
 
 func Create(ctx context.Context, params CreateParams) (*Workspace, error) {
 	now := time.Now().UnixNano()
-	settings := params.Settings
-	if settings == nil {
-		settings = &WorkspaceSettings{}
+	var settings WorkspaceSettings
+	if params.Settings != nil {
+		settings = *params.Settings
+	} else {
+		settings = DefaultSettings()
 	}
 	settingsJSON, err := json.Marshal(settings)
 	if err != nil {

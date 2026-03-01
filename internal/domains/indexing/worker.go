@@ -7,12 +7,14 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gomantics/semantix/config"
 	"github.com/gomantics/semantix/internal/db"
 	"github.com/gomantics/semantix/internal/domains/gittokens"
 	"github.com/gomantics/semantix/internal/domains/repos"
+	"github.com/gomantics/semantix/internal/domains/workspaces"
 	"github.com/gomantics/semantix/internal/libs/chunking"
 	"github.com/gomantics/semantix/internal/libs/gitrepo"
 	"github.com/gomantics/semantix/internal/libs/openai"
@@ -24,8 +26,8 @@ import (
 
 // Worker processes a single repo indexing job.
 type Worker struct {
-	l       *zap.Logger
-	cloner  gitrepo.Cloner
+	l        *zap.Logger
+	cloner   gitrepo.Cloner
 	embedder openai.Embedder
 }
 
@@ -90,6 +92,11 @@ func (w *Worker) Process(ctx context.Context, repo repos.Repo) {
 }
 
 func (w *Worker) processRepo(ctx context.Context, repo repos.Repo, stats *runStats) error {
+	ws, err := workspaces.GetByID(ctx, repo.WorkspaceID)
+	if err != nil {
+		return fmt.Errorf("get workspace: %w", err)
+	}
+
 	// Step 1: Clone
 	if _, err := repos.UpdateStatus(ctx, repo.ID, repos.StatusCloning, nil); err != nil {
 		return fmt.Errorf("set cloning status: %w", err)
@@ -106,7 +113,7 @@ func (w *Worker) processRepo(ctx context.Context, repo repos.Repo, stats *runSta
 	}
 
 	// Step 3: Walk, chunk, embed, upsert
-	if err := w.indexFiles(ctx, repo, cloneDir, stats); err != nil {
+	if err := w.indexFiles(ctx, repo, cloneDir, ws.Settings, stats); err != nil {
 		return err
 	}
 
@@ -134,7 +141,7 @@ func (w *Worker) cloneRepo(ctx context.Context, repo repos.Repo, cloneDir string
 	})
 }
 
-func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string, stats *runStats) error {
+func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string, settings workspaces.WorkspaceSettings, stats *runStats) error {
 	maxFileSize := config.Indexing.MaxFileSizeBytes()
 
 	type fileEntry struct {
@@ -150,6 +157,8 @@ func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string
 		}
 
 		relPath, _ := filepath.Rel(rootDir, path)
+
+		// Always apply hard infrastructure excludes (.git, node_modules, etc.).
 		if gitrepo.ShouldExclude(relPath) {
 			if d.IsDir() {
 				return filepath.SkipDir
@@ -157,7 +166,20 @@ func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string
 			return nil
 		}
 
+		// Apply workspace-level exclude patterns.
+		if matchesAnyPattern(relPath, settings.ExcludePatterns) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
 		if d.IsDir() {
+			return nil
+		}
+
+		// Apply workspace-level include patterns (when set, only matching files are indexed).
+		if len(settings.IncludePatterns) > 0 && !matchesAnyPattern(relPath, settings.IncludePatterns) {
 			return nil
 		}
 
@@ -372,4 +394,28 @@ func languageFromChunks(chunks []chunking.Chunk) *string {
 		return nil
 	}
 	return &lang
+}
+
+// matchesAnyPattern reports whether relPath matches any of the given patterns.
+// Patterns follow the same conventions as WorkspaceSettings:
+//   - "dir/" matches the directory and everything under it
+//   - "*.ext" matches files by extension
+//   - any other value is treated as an exact path match
+func matchesAnyPattern(relPath string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if strings.HasSuffix(pattern, "/") {
+			dir := strings.TrimSuffix(pattern, "/")
+			if relPath == dir || strings.HasPrefix(relPath, dir+"/") || strings.Contains(relPath, "/"+dir+"/") {
+				return true
+			}
+		} else if strings.HasPrefix(pattern, "*") {
+			suffix := strings.TrimPrefix(pattern, "*")
+			if strings.HasSuffix(relPath, suffix) {
+				return true
+			}
+		} else if relPath == pattern {
+			return true
+		}
+	}
+	return false
 }

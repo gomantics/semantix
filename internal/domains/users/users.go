@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/gomantics/semantix/internal/db"
+	"github.com/gomantics/semantix/internal/domains/workspaces"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
@@ -139,10 +141,15 @@ func Signup(ctx context.Context, params CreateParams) (*SignupResult, error) {
 			return SignupResult{}, err
 		}
 
+		defaultSettings, err := json.Marshal(workspaces.DefaultSettings())
+		if err != nil {
+			return SignupResult{}, err
+		}
+
 		_, err = q.CreateWorkspace(ctx, db.CreateWorkspaceParams{
 			Name:        "Default",
 			Description: pgtype.Text{Valid: false},
-			Settings:    []byte("{}"),
+			Settings:    defaultSettings,
 			Created:     now,
 			Updated:     now,
 		})

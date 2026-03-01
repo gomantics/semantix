@@ -5,7 +5,24 @@ type WorkspaceSettings struct {
 	// ExcludePatterns are glob patterns to exclude from indexing (e.g. ["docs/", "*.test.ts"]).
 	ExcludePatterns []string `json:"exclude_patterns,omitempty"`
 	// IncludePatterns restrict indexing to matching files (e.g. ["*.go", "*.ts", "*.py"]).
+	// When empty, all files not matched by ExcludePatterns are indexed.
 	IncludePatterns []string `json:"include_patterns,omitempty"`
+}
+
+// DefaultSettings returns a WorkspaceSettings pre-populated with sensible
+// defaults that exclude common non-source directories and binary artifacts.
+func DefaultSettings() WorkspaceSettings {
+	return WorkspaceSettings{
+		ExcludePatterns: []string{
+			"node_modules/",
+			"vendor/",
+			".git/",
+			"*.lock",
+			"*.min.js",
+			"dist/",
+			"build/",
+		},
+	}
 }
 
 // Workspace represents a workspace for organizing repositories
