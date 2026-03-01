@@ -1,0 +1,10 @@
+[
+  {
+    "filePath": "server.go",
+    "language": "go",
+    "chunkType": "block",
+    "symbolName": "block",
+    "startLine": 1,
+    "endLine": 18
+  }
+]

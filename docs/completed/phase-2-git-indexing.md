@@ -73,18 +73,19 @@ Support the major git hosting providers.
 
 ### 2.3 Tree-sitter Chunking
 
-AST-aware code chunking using chunkx or similar.
+AST-aware code chunking using [`github.com/gomantics/chunkx`](https://github.com/gomantics/chunkx) - our own Go library implementing the CAST algorithm.
 
-- [ ] **Language detection** from file extension and content
+- [ ] **Language detection** - chunkx uses file extension via `languages.*` constants
 
 - [ ] **Chunking strategy**:
   - Functions/methods as primary chunks
   - Classes/structs with their methods
   - Large functions split at logical boundaries
-  - Target: ~500 tokens per chunk
+  - Target: ~500 tokens per chunk via `chunkx.WithMaxSize(500)`
 
-- [ ] **Chunk metadata**:
+- [ ] **Chunk metadata** - map chunkx output to our internal type:
   ```go
+  // chunkx returns []chunkx.Chunk; map to:
   type Chunk struct {
       Content    string
       FilePath   string
@@ -96,6 +97,19 @@ AST-aware code chunking using chunkx or similar.
   }
   ```
 
+- [ ] **Quick example**:
+  ```go
+  import (
+      "github.com/gomantics/chunkx"
+      "github.com/gomantics/chunkx/languages"
+  )
+
+  chunker := chunkx.NewChunker()
+  chunks, err := chunker.Chunk(code,
+      chunkx.WithLanguage(languages.Go),
+      chunkx.WithMaxSize(500))
+  ```
+
 - [ ] **Language support** (priority order):
   - Go, Python, JavaScript/TypeScript
   - Java, Rust, C/C++
@@ -103,7 +117,7 @@ AST-aware code chunking using chunkx or similar.
   - Markdown, YAML, JSON (as text)
 
 **Files to create/modify:**
-- `libs/chunking/chunker.go`
+- `libs/chunking/chunker.go` - thin wrapper around chunkx
 - `domains/chunking/chunker.go` - higher-level orchestration
 
 ---
@@ -327,7 +341,7 @@ POST /v1/workspaces/:wid/repos  (status = pending)
 ## Dependencies
 
 - `github.com/go-git/go-git/v5` - Git operations
-- Tree-sitter Go bindings or `chunkx` CLI
+- `github.com/gomantics/chunkx` - AST-based code chunking (CAST algorithm, 30+ languages)
 - `github.com/sashabaranov/go-openai` - OpenAI client
 - `github.com/qdrant/go-client` - Qdrant client
 

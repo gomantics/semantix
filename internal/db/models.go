@@ -27,6 +27,20 @@ type GitToken struct {
 	Created        int64       `json:"created"`
 }
 
+type IndexRun struct {
+	ID                  int64       `json:"id"`
+	RepoID              int64       `json:"repo_id"`
+	Status              string      `json:"status"`
+	StartedAt           int64       `json:"started_at"`
+	CompletedAt         pgtype.Int8 `json:"completed_at"`
+	FilesProcessed      int32       `json:"files_processed"`
+	ChunksCreated       int32       `json:"chunks_created"`
+	EmbeddingsGenerated int32       `json:"embeddings_generated"`
+	EmbeddingsCached    int32       `json:"embeddings_cached"`
+	ErrorMessage        pgtype.Text `json:"error_message"`
+	DurationMs          pgtype.Int8 `json:"duration_ms"`
+}
+
 type Repo struct {
 	ID           int64       `json:"id"`
 	WorkspaceID  int64       `json:"workspace_id"`

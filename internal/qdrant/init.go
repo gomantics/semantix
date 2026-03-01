@@ -86,6 +86,14 @@ func GetPointsClient() pb.PointsClient {
 	return pointsClient
 }
 
+// SetClients replaces the global qdrant clients. Intended for use in tests only.
+func SetClients(conn *grpc.ClientConn) {
+	defaultConn = conn
+	defaultClient = pb.NewQdrantClient(conn)
+	collectionsClient = pb.NewCollectionsClient(conn)
+	pointsClient = pb.NewPointsClient(conn)
+}
+
 // HealthCheck pings Qdrant for health endpoint
 func HealthCheck(ctx context.Context) error {
 	if defaultClient == nil {

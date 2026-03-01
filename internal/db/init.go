@@ -58,3 +58,8 @@ func Init(lc fx.Lifecycle, l *zap.Logger) error {
 func GetPool() *pgxpool.Pool {
 	return defaultPool
 }
+
+// SetPool replaces the default connection pool. Intended for use in tests only.
+func SetPool(pool *pgxpool.Pool) {
+	defaultPool = pool
+}
