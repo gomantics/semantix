@@ -11,18 +11,18 @@ func TestParseProvider(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		input    string
-		expected Provider
-		wantErr  bool
+		input   string
+		want    Provider
+		wantErr bool
 	}{
 		{"github", ProviderGitHub, false},
 		{"GITHUB", ProviderGitHub, false},
 		{"  github  ", ProviderGitHub, false},
 		{"gitlab", ProviderGitLab, false},
-		{"bitbucket", ProviderBitbucket, false},
-		{"unknown", ProviderUnknown, true},
-		{"invalid", ProviderUnknown, true},
-		{"", ProviderUnknown, true},
+		{"bitbucket", "", true},
+		{"unknown", "", true},
+		{"invalid", "", true},
+		{"", "", true},
 	}
 
 	for _, tt := range tests {
@@ -38,7 +38,7 @@ func TestParseProvider(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, got)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -47,27 +47,32 @@ func TestDetectProvider(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		url      string
-		expected Provider
+		url     string
+		want    Provider
+		wantErr bool
 	}{
-		{"https://github.com/org/repo", ProviderGitHub},
-		{"https://github.com/org/repo.git", ProviderGitHub},
-		{"git@github.com:org/repo.git", ProviderGitHub},
-		{"https://GITHUB.COM/org/repo", ProviderGitHub},
-		{"https://gitlab.com/org/repo", ProviderGitLab},
-		{"https://gitlab.com/org/subgroup/repo.git", ProviderGitLab},
-		{"https://bitbucket.org/org/repo", ProviderBitbucket},
-		{"https://bitbucket.org/org/repo.git", ProviderBitbucket},
-		{"https://example.com/org/repo", ProviderUnknown},
-		{"https://mygitlab.internal/org/repo", ProviderUnknown},
-		{"", ProviderUnknown},
+		{"https://github.com/org/repo", ProviderGitHub, false},
+		{"https://github.com/org/repo.git", ProviderGitHub, false},
+		{"git@github.com:org/repo.git", ProviderGitHub, false},
+		{"https://GITHUB.COM/org/repo", ProviderGitHub, false},
+		{"https://gitlab.com/org/repo", ProviderGitLab, false},
+		{"https://gitlab.com/org/subgroup/repo.git", ProviderGitLab, false},
+		{"https://bitbucket.org/org/repo", "", true},
+		{"https://example.com/org/repo", "", true},
+		{"https://mygitlab.internal/org/repo", "", true},
+		{"", "", true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.url, func(t *testing.T) {
 			t.Parallel()
-			got := DetectProvider(tt.url)
-			assert.Equal(t, tt.expected, got)
+			got, err := DetectProvider(tt.url)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -99,22 +104,6 @@ func TestAuthenticatedURL(t *testing.T) {
 			wantUser: "oauth2",
 			wantPass: "glpat-abc123",
 		},
-		{
-			name:     "bitbucket injects x-token-auth user",
-			repoURL:  "https://bitbucket.org/org/repo",
-			token:    "atl_abc123",
-			provider: ProviderBitbucket,
-			wantUser: "x-token-auth",
-			wantPass: "atl_abc123",
-		},
-		{
-			name:     "unknown provider uses generic token user",
-			repoURL:  "https://example.com/org/repo",
-			token:    "mytoken",
-			provider: ProviderUnknown,
-			wantUser: "token",
-			wantPass: "mytoken",
-		},
 	}
 
 	for _, tt := range tests {
@@ -138,6 +127,12 @@ func TestAuthenticatedURL(t *testing.T) {
 	t.Run("invalid URL returns error", func(t *testing.T) {
 		t.Parallel()
 		_, err := AuthenticatedURL("://bad url", "token", ProviderGitHub)
+		assert.Error(t, err)
+	})
+
+	t.Run("unsupported provider returns error", func(t *testing.T) {
+		t.Parallel()
+		_, err := AuthenticatedURL("https://example.com/org/repo", "token", "bitbucket")
 		assert.Error(t, err)
 	})
 }

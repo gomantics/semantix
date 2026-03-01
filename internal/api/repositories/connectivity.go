@@ -28,7 +28,10 @@ func TestConnectivity(c web.Context) error {
 	}
 
 	ctx := c.Request().Context()
-	provider := gitrepo.DetectProvider(req.URL)
+	provider, err := gitrepo.DetectProvider(req.URL)
+	if err != nil {
+		return c.BadRequest("unsupported git host: must be github.com or gitlab.com")
+	}
 
 	var token string
 	if req.GitTokenID != nil {
@@ -39,7 +42,7 @@ func TestConnectivity(c web.Context) error {
 		token = gt.Token
 	}
 
-	err := gitrepo.CheckConnectivity(ctx, gitrepo.CloneOptions{
+	err = gitrepo.CheckConnectivity(ctx, gitrepo.CloneOptions{
 		URL:      req.URL,
 		Provider: provider,
 		Token:    token,

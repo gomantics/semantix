@@ -74,7 +74,7 @@ func TestClone_fresh(t *testing.T) {
 		URL:      bareURL,
 		Branch:   "main",
 		DestDir:  destDir,
-		Provider: ProviderUnknown,
+		Provider: ProviderGitHub,
 	})
 	require.NoError(t, err)
 
@@ -91,7 +91,7 @@ func TestClone_pull_alreadyUpToDate(t *testing.T) {
 		URL:      bareURL,
 		Branch:   "main",
 		DestDir:  destDir,
-		Provider: ProviderUnknown,
+		Provider: ProviderGitHub,
 	}
 
 	// First clone.
@@ -113,7 +113,7 @@ func TestClone_pull_withNewCommit(t *testing.T) {
 		URL:      bareURL,
 		Branch:   "main",
 		DestDir:  destDir,
-		Provider: ProviderUnknown,
+		Provider: ProviderGitHub,
 	}
 
 	// Initial clone.
@@ -138,7 +138,7 @@ func TestClone_badURL(t *testing.T) {
 		URL:      "file:///nonexistent/repo.git",
 		Branch:   "main",
 		DestDir:  destDir,
-		Provider: ProviderUnknown,
+		Provider: ProviderGitHub,
 	})
 
 	assert.Error(t, err)

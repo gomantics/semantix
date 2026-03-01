@@ -121,7 +121,10 @@ func (w *Worker) processRepo(ctx context.Context, repo repos.Repo, stats *runSta
 }
 
 func (w *Worker) cloneRepo(ctx context.Context, repo repos.Repo, cloneDir string) error {
-	provider := gitrepo.DetectProvider(repo.URL)
+	provider, err := gitrepo.DetectProvider(repo.URL)
+	if err != nil {
+		return fmt.Errorf("detect provider for %s: %w", repo.URL, err)
+	}
 
 	var token string
 	if repo.GitTokenID != nil {

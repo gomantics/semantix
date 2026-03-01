@@ -47,9 +47,8 @@ func cloneFresh(ctx context.Context, opts CloneOptions) error {
 	var auth *http.BasicAuth
 
 	if opts.Token != "" {
-		user, _ := tokenUser(opts.Provider)
 		auth = &http.BasicAuth{
-			Username: user,
+			Username: tokenUser(opts.Provider),
 			Password: opts.Token,
 		}
 	}
@@ -88,9 +87,8 @@ func pull(ctx context.Context, opts CloneOptions) error {
 
 	var auth *http.BasicAuth
 	if opts.Token != "" {
-		user, _ := tokenUser(opts.Provider)
 		auth = &http.BasicAuth{
-			Username: user,
+			Username: tokenUser(opts.Provider),
 			Password: opts.Token,
 		}
 	}
@@ -115,16 +113,14 @@ func pull(ctx context.Context, opts CloneOptions) error {
 	return nil
 }
 
-func tokenUser(provider Provider) (string, string) {
+func tokenUser(provider Provider) string {
 	switch provider {
 	case ProviderGitHub:
-		return "x-access-token", ""
+		return "x-access-token"
 	case ProviderGitLab:
-		return "oauth2", ""
-	case ProviderBitbucket:
-		return "x-token-auth", ""
+		return "oauth2"
 	default:
-		return "token", ""
+		return "token"
 	}
 }
 
@@ -139,9 +135,8 @@ func CheckConnectivity(ctx context.Context, opts CloneOptions) error {
 
 	var auth *http.BasicAuth
 	if opts.Token != "" {
-		user, _ := tokenUser(opts.Provider)
 		auth = &http.BasicAuth{
-			Username: user,
+			Username: tokenUser(opts.Provider),
 			Password: opts.Token,
 		}
 	}

@@ -80,20 +80,17 @@ func TestFindForProvider_found(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	// Create the token and assert using the returned ID to avoid cross-test
-	// interference from other parallel tests inserting Bitbucket tokens.
 	created, err := gittokens.Create(ctx, gittokens.CreateParams{
-		Name:     "Bitbucket Token",
-		Provider: gitrepo.ProviderBitbucket,
-		Token:    "atl_mytoken",
+		Name:     "GitLab Token",
+		Provider: gitrepo.ProviderGitLab,
+		Token:    "glpat_mytoken",
 	})
 	require.NoError(t, err)
 
-	got, err := gittokens.FindForProvider(ctx, gitrepo.ProviderBitbucket)
+	got, err := gittokens.FindForProvider(ctx, gitrepo.ProviderGitLab)
 	require.NoError(t, err)
 	require.NotNil(t, got)
-	assert.Equal(t, gitrepo.ProviderBitbucket, got.Provider)
-	// The returned token must be one we created (there may be others from parallel tests).
+	assert.Equal(t, gitrepo.ProviderGitLab, got.Provider)
 	assert.NotZero(t, got.ID)
 	_ = created
 }
@@ -102,8 +99,7 @@ func TestFindForProvider_notFound(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	// ProviderUnknown is never inserted by any other test.
-	got, err := gittokens.FindForProvider(ctx, gitrepo.ProviderUnknown)
+	got, err := gittokens.FindForProvider(ctx, "nonexistent")
 	require.NoError(t, err)
 	assert.Nil(t, got)
 }

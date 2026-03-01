@@ -10,37 +10,34 @@ import (
 type Provider string
 
 const (
-	ProviderGitHub    Provider = "github"
-	ProviderGitLab    Provider = "gitlab"
-	ProviderBitbucket Provider = "bitbucket"
-	ProviderUnknown   Provider = "unknown"
+	ProviderGitHub Provider = "github"
+	ProviderGitLab Provider = "gitlab"
 )
 
 // ValidProviders are the providers that can be used for git tokens.
-var ValidProviders = []Provider{ProviderGitHub, ProviderGitLab, ProviderBitbucket}
+var ValidProviders = []Provider{ProviderGitHub, ProviderGitLab}
 
 // ParseProvider validates and returns a Provider from a string.
-// Only github, gitlab, and bitbucket are accepted for token configuration.
+// Only github and gitlab are accepted for token configuration.
 func ParseProvider(s string) (Provider, error) {
 	p := Provider(strings.ToLower(strings.TrimSpace(s)))
 	if slices.Contains(ValidProviders, p) {
 		return p, nil
 	}
-	return "", fmt.Errorf("invalid provider %q: must be github, gitlab, or bitbucket", s)
+	return "", fmt.Errorf("invalid provider %q: must be github or gitlab", s)
 }
 
 // DetectProvider determines the git hosting provider from a clone URL.
-func DetectProvider(repoURL string) Provider {
+// Returns an error if the URL does not match a supported provider.
+func DetectProvider(repoURL string) (Provider, error) {
 	lower := strings.ToLower(repoURL)
 	switch {
 	case strings.Contains(lower, "github.com"):
-		return ProviderGitHub
+		return ProviderGitHub, nil
 	case strings.Contains(lower, "gitlab.com"):
-		return ProviderGitLab
-	case strings.Contains(lower, "bitbucket.org"):
-		return ProviderBitbucket
+		return ProviderGitLab, nil
 	default:
-		return ProviderUnknown
+		return "", fmt.Errorf("unsupported git host in URL %q: must be github.com or gitlab.com", repoURL)
 	}
 }
 
@@ -60,10 +57,8 @@ func AuthenticatedURL(repoURL, token string, provider Provider) (string, error) 
 		parsed.User = url.UserPassword("x-access-token", token)
 	case ProviderGitLab:
 		parsed.User = url.UserPassword("oauth2", token)
-	case ProviderBitbucket:
-		parsed.User = url.UserPassword("x-token-auth", token)
 	default:
-		parsed.User = url.UserPassword("token", token)
+		return "", fmt.Errorf("unsupported provider: %s", provider)
 	}
 
 	return parsed.String(), nil
