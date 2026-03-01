@@ -141,3 +141,38 @@ func (q *Queries) ListGitTokensByProvider(ctx context.Context, provider string) 
 	}
 	return items, nil
 }
+
+const updateGitToken = `-- name: UpdateGitToken :one
+UPDATE git_tokens
+SET name = $2,
+    token_encrypted = $3,
+    token_hint = $4
+WHERE id = $1
+RETURNING id, name, provider, token_encrypted, token_hint, created
+`
+
+type UpdateGitTokenParams struct {
+	ID             int64       `json:"id"`
+	Name           string      `json:"name"`
+	TokenEncrypted []byte      `json:"token_encrypted"`
+	TokenHint      pgtype.Text `json:"token_hint"`
+}
+
+func (q *Queries) UpdateGitToken(ctx context.Context, arg UpdateGitTokenParams) (GitToken, error) {
+	row := q.db.QueryRow(ctx, updateGitToken,
+		arg.ID,
+		arg.Name,
+		arg.TokenEncrypted,
+		arg.TokenHint,
+	)
+	var i GitToken
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Provider,
+		&i.TokenEncrypted,
+		&i.TokenHint,
+		&i.Created,
+	)
+	return i, err
+}

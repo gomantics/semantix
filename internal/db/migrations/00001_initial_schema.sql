@@ -42,9 +42,11 @@ CREATE TABLE IF NOT EXISTS git_tokens (
 CREATE TABLE IF NOT EXISTS repos (
   id            BIGSERIAL PRIMARY KEY,
   workspace_id  BIGINT NOT NULL,
+  git_token_id  BIGINT,         -- optional: explicit token to use for cloning
   url           TEXT NOT NULL,
   branch        TEXT NOT NULL,
-  status        TEXT NOT NULL,  -- pending, indexing, ready, error
+  is_private    BOOLEAN NOT NULL DEFAULT false,
+  status        TEXT NOT NULL,  -- pending, cloning, indexing, ready, error
   indexed_at    BIGINT,         -- nanoseconds since epoch, null until first index
   error_message TEXT,
   created       BIGINT NOT NULL, -- nanoseconds since epoch

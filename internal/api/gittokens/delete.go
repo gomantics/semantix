@@ -21,6 +21,9 @@ func Delete(c web.Context) error {
 		if errors.Is(err, gittokens.ErrNotFound) {
 			return c.NotFound("git token not found")
 		}
+		if errors.Is(err, gittokens.ErrInUse) {
+			return c.Conflict("git token is in use by one or more repositories")
+		}
 		c.L.Error("failed to delete git token", zap.Error(err), zap.Int64("id", id))
 		return c.InternalError("failed to delete git token")
 	}

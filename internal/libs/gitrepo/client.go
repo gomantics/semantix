@@ -128,6 +128,36 @@ func tokenUser(provider Provider) (string, string) {
 	}
 }
 
+// CheckConnectivity performs a lightweight ls-remote to verify that the given
+// URL is reachable and the token (if provided) has read access. It does not
+// clone or write anything to disk.
+func CheckConnectivity(ctx context.Context, opts CloneOptions) error {
+	cloneURL := opts.URL
+	if !strings.HasSuffix(cloneURL, ".git") {
+		cloneURL += ".git"
+	}
+
+	var auth *http.BasicAuth
+	if opts.Token != "" {
+		user, _ := tokenUser(opts.Provider)
+		auth = &http.BasicAuth{
+			Username: user,
+			Password: opts.Token,
+		}
+	}
+
+	remote := git.NewRemote(nil, &config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{cloneURL},
+	})
+
+	_, err := remote.ListContext(ctx, &git.ListOptions{Auth: auth})
+	if err != nil {
+		return fmt.Errorf("connectivity check failed for %s: %w", opts.URL, err)
+	}
+	return nil
+}
+
 // ShouldExclude returns true if the given relative path should be excluded
 // from indexing (matches sparse checkout exclude patterns).
 func ShouldExclude(relPath string) bool {

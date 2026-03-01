@@ -19,6 +19,14 @@ FROM git_tokens
 WHERE provider = $1
 ORDER BY created DESC;
 
+-- name: UpdateGitToken :one
+UPDATE git_tokens
+SET name = $2,
+    token_encrypted = $3,
+    token_hint = $4
+WHERE id = $1
+RETURNING id, name, provider, token_encrypted, token_hint, created;
+
 -- name: DeleteGitToken :exec
 DELETE FROM git_tokens
 WHERE id = $1;

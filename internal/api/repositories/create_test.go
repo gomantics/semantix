@@ -24,6 +24,18 @@ func TestCreate_success(t *testing.T) {
 	assert.Equal(t, "main", body["branch"])
 }
 
+func TestCreate_privateWithoutToken(t *testing.T) {
+	t.Parallel()
+	s := testutil.NewAuthState(t)
+	wid := createWorkspace(t, s)
+
+	err := s.PostStatus("/v1/workspaces/"+wid+"/repos", map[string]any{
+		"url":        "https://github.com/example/private-repo",
+		"is_private": true,
+	})
+	testutil.RequireStatus(t, err, http.StatusBadRequest)
+}
+
 func TestCreate_missingURL(t *testing.T) {
 	t.Parallel()
 	s := testutil.NewAuthState(t)

@@ -16,3 +16,8 @@ type CreateParams struct {
 	Provider gitrepo.Provider
 	Token    string
 }
+
+type UpdateParams struct {
+	Name  string
+	Token string
+}

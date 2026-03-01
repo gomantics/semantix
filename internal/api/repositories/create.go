@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/gomantics/semantix/internal/api/web"
@@ -9,8 +10,10 @@ import (
 )
 
 type CreateRequest struct {
-	URL    string `json:"url"`
-	Branch string `json:"branch,omitempty"`
+	URL        string `json:"url"`
+	Branch     string `json:"branch,omitempty"`
+	IsPrivate  bool   `json:"is_private,omitempty"`
+	GitTokenID *int64 `json:"git_token_id,omitempty"`
 }
 
 func Create(c web.Context) error {
@@ -32,10 +35,15 @@ func Create(c web.Context) error {
 
 	repo, err := repos.Create(ctx, repos.CreateParams{
 		WorkspaceID: wid,
+		GitTokenID:  req.GitTokenID,
 		URL:         req.URL,
 		Branch:      req.Branch,
+		IsPrivate:   req.IsPrivate,
 	})
 	if err != nil {
+		if errors.Is(err, repos.ErrTokenRequired) {
+			return c.BadRequest("git_token_id is required for private repositories")
+		}
 		c.L.Error("failed to create repo", zap.Error(err), zap.Int64("wid", wid))
 		return c.InternalError("failed to create repo")
 	}

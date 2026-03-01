@@ -124,11 +124,11 @@ func (w *Worker) cloneRepo(ctx context.Context, repo repos.Repo, cloneDir string
 	provider := gitrepo.DetectProvider(repo.URL)
 
 	var token string
-	gt, err := gittokens.FindForProvider(ctx, provider)
-	if err != nil {
-		w.l.Warn("failed to look up git token, proceeding without auth", zap.Error(err))
-	}
-	if gt != nil {
+	if repo.GitTokenID != nil {
+		gt, err := gittokens.GetByID(ctx, *repo.GitTokenID)
+		if err != nil {
+			return fmt.Errorf("load git token %d: %w", *repo.GitTokenID, err)
+		}
 		token = gt.Token
 	}
 

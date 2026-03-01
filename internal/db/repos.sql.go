@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countReposByGitToken = `-- name: CountReposByGitToken :one
+SELECT COUNT(*)
+FROM repos
+WHERE git_token_id = $1
+`
+
+func (q *Queries) CountReposByGitToken(ctx context.Context, gitTokenID pgtype.Int8) (int64, error) {
+	row := q.db.QueryRow(ctx, countReposByGitToken, gitTokenID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countReposByWorkspace = `-- name: CountReposByWorkspace :one
 SELECT COUNT(*)
 FROM repos
@@ -25,15 +38,17 @@ func (q *Queries) CountReposByWorkspace(ctx context.Context, workspaceID int64) 
 }
 
 const createRepo = `-- name: CreateRepo :one
-INSERT INTO repos (workspace_id, url, branch, status, indexed_at, error_message, created, updated)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, workspace_id, url, branch, status, indexed_at, error_message, created, updated
+INSERT INTO repos (workspace_id, git_token_id, url, branch, is_private, status, indexed_at, error_message, created, updated)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, workspace_id, git_token_id, url, branch, is_private, status, indexed_at, error_message, created, updated
 `
 
 type CreateRepoParams struct {
 	WorkspaceID  int64       `json:"workspace_id"`
+	GitTokenID   pgtype.Int8 `json:"git_token_id"`
 	Url          string      `json:"url"`
 	Branch       string      `json:"branch"`
+	IsPrivate    bool        `json:"is_private"`
 	Status       string      `json:"status"`
 	IndexedAt    pgtype.Int8 `json:"indexed_at"`
 	ErrorMessage pgtype.Text `json:"error_message"`
@@ -44,8 +59,10 @@ type CreateRepoParams struct {
 func (q *Queries) CreateRepo(ctx context.Context, arg CreateRepoParams) (Repo, error) {
 	row := q.db.QueryRow(ctx, createRepo,
 		arg.WorkspaceID,
+		arg.GitTokenID,
 		arg.Url,
 		arg.Branch,
+		arg.IsPrivate,
 		arg.Status,
 		arg.IndexedAt,
 		arg.ErrorMessage,
@@ -56,8 +73,10 @@ func (q *Queries) CreateRepo(ctx context.Context, arg CreateRepoParams) (Repo, e
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
+		&i.GitTokenID,
 		&i.Url,
 		&i.Branch,
+		&i.IsPrivate,
 		&i.Status,
 		&i.IndexedAt,
 		&i.ErrorMessage,
@@ -88,7 +107,7 @@ func (q *Queries) DeleteReposByWorkspace(ctx context.Context, workspaceID int64)
 }
 
 const getRepoByID = `-- name: GetRepoByID :one
-SELECT id, workspace_id, url, branch, status, indexed_at, error_message, created, updated
+SELECT id, workspace_id, git_token_id, url, branch, is_private, status, indexed_at, error_message, created, updated
 FROM repos
 WHERE id = $1
 `
@@ -99,8 +118,10 @@ func (q *Queries) GetRepoByID(ctx context.Context, id int64) (Repo, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
+		&i.GitTokenID,
 		&i.Url,
 		&i.Branch,
+		&i.IsPrivate,
 		&i.Status,
 		&i.IndexedAt,
 		&i.ErrorMessage,
@@ -111,7 +132,7 @@ func (q *Queries) GetRepoByID(ctx context.Context, id int64) (Repo, error) {
 }
 
 const listReposByStatus = `-- name: ListReposByStatus :many
-SELECT id, workspace_id, url, branch, status, indexed_at, error_message, created, updated
+SELECT id, workspace_id, git_token_id, url, branch, is_private, status, indexed_at, error_message, created, updated
 FROM repos
 WHERE status = $1
 ORDER BY created ASC
@@ -135,8 +156,10 @@ func (q *Queries) ListReposByStatus(ctx context.Context, arg ListReposByStatusPa
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
+			&i.GitTokenID,
 			&i.Url,
 			&i.Branch,
+			&i.IsPrivate,
 			&i.Status,
 			&i.IndexedAt,
 			&i.ErrorMessage,
@@ -154,7 +177,7 @@ func (q *Queries) ListReposByStatus(ctx context.Context, arg ListReposByStatusPa
 }
 
 const listReposByWorkspace = `-- name: ListReposByWorkspace :many
-SELECT id, workspace_id, url, branch, status, indexed_at, error_message, created, updated
+SELECT id, workspace_id, git_token_id, url, branch, is_private, status, indexed_at, error_message, created, updated
 FROM repos
 WHERE workspace_id = $1
 ORDER BY created DESC
@@ -179,8 +202,10 @@ func (q *Queries) ListReposByWorkspace(ctx context.Context, arg ListReposByWorks
 		if err := rows.Scan(
 			&i.ID,
 			&i.WorkspaceID,
+			&i.GitTokenID,
 			&i.Url,
 			&i.Branch,
+			&i.IsPrivate,
 			&i.Status,
 			&i.IndexedAt,
 			&i.ErrorMessage,
@@ -199,33 +224,41 @@ func (q *Queries) ListReposByWorkspace(ctx context.Context, arg ListReposByWorks
 
 const updateRepo = `-- name: UpdateRepo :one
 UPDATE repos
-SET url = $2,
-    branch = $3,
-    updated = $4
+SET git_token_id = $2,
+    url = $3,
+    branch = $4,
+    is_private = $5,
+    updated = $6
 WHERE id = $1
-RETURNING id, workspace_id, url, branch, status, indexed_at, error_message, created, updated
+RETURNING id, workspace_id, git_token_id, url, branch, is_private, status, indexed_at, error_message, created, updated
 `
 
 type UpdateRepoParams struct {
-	ID      int64  `json:"id"`
-	Url     string `json:"url"`
-	Branch  string `json:"branch"`
-	Updated int64  `json:"updated"`
+	ID         int64       `json:"id"`
+	GitTokenID pgtype.Int8 `json:"git_token_id"`
+	Url        string      `json:"url"`
+	Branch     string      `json:"branch"`
+	IsPrivate  bool        `json:"is_private"`
+	Updated    int64       `json:"updated"`
 }
 
 func (q *Queries) UpdateRepo(ctx context.Context, arg UpdateRepoParams) (Repo, error) {
 	row := q.db.QueryRow(ctx, updateRepo,
 		arg.ID,
+		arg.GitTokenID,
 		arg.Url,
 		arg.Branch,
+		arg.IsPrivate,
 		arg.Updated,
 	)
 	var i Repo
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
+		&i.GitTokenID,
 		&i.Url,
 		&i.Branch,
+		&i.IsPrivate,
 		&i.Status,
 		&i.IndexedAt,
 		&i.ErrorMessage,
@@ -242,7 +275,7 @@ SET status = $2,
     error_message = $4,
     updated = $5
 WHERE id = $1
-RETURNING id, workspace_id, url, branch, status, indexed_at, error_message, created, updated
+RETURNING id, workspace_id, git_token_id, url, branch, is_private, status, indexed_at, error_message, created, updated
 `
 
 type UpdateRepoStatusParams struct {
@@ -265,8 +298,10 @@ func (q *Queries) UpdateRepoStatus(ctx context.Context, arg UpdateRepoStatusPara
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
+		&i.GitTokenID,
 		&i.Url,
 		&i.Branch,
+		&i.IsPrivate,
 		&i.Status,
 		&i.IndexedAt,
 		&i.ErrorMessage,

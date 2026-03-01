@@ -6,12 +6,16 @@ import (
 	"time"
 
 	"github.com/gomantics/semantix/internal/db"
+	"github.com/gomantics/semantix/internal/domains/repos"
 	"github.com/gomantics/semantix/internal/libs/gitrepo"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-var ErrNotFound = errors.New("git token not found")
+var (
+	ErrNotFound = errors.New("git token not found")
+	ErrInUse    = errors.New("git token is in use by one or more repositories")
+)
 
 func Create(ctx context.Context, params CreateParams) (*GitToken, error) {
 	now := time.Now().UnixNano()
@@ -51,6 +55,35 @@ func GetByID(ctx context.Context, id int64) (*GitToken, error) {
 	return rowToGitToken(row), nil
 }
 
+func Update(ctx context.Context, id int64, params UpdateParams) (*GitToken, error) {
+	tokenHint := pgtype.Text{}
+	if len(params.Token) >= 4 {
+		tokenHint = pgtype.Text{String: params.Token[len(params.Token)-4:], Valid: true}
+	}
+
+	row, err := db.Tx1(ctx, func(q *db.Queries) (db.GitToken, error) {
+		_, err := q.GetGitTokenByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return db.GitToken{}, ErrNotFound
+			}
+			return db.GitToken{}, err
+		}
+
+		return q.UpdateGitToken(ctx, db.UpdateGitTokenParams{
+			ID:             id,
+			Name:           params.Name,
+			TokenEncrypted: []byte(params.Token),
+			TokenHint:      tokenHint,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return rowToGitToken(row), nil
+}
+
 // FindForProvider returns the first available token for the given provider.
 func FindForProvider(ctx context.Context, provider gitrepo.Provider) (*GitToken, error) {
 	rows, err := db.Query1(ctx, func(q *db.Queries) ([]db.GitToken, error) {
@@ -83,6 +116,14 @@ func List(ctx context.Context) ([]GitToken, error) {
 }
 
 func Delete(ctx context.Context, id int64) error {
+	count, err := repos.CountByGitToken(ctx, id)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return ErrInUse
+	}
+
 	return db.Tx(ctx, func(q *db.Queries) error {
 		_, err := q.GetGitTokenByID(ctx, id)
 		if err != nil {

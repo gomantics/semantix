@@ -85,6 +85,10 @@ func (c Context) Created(data any) error {
 	return c.JSON(http.StatusCreated, data)
 }
 
+func (c Context) Conflict(message string) error {
+	return c.Error(http.StatusConflict, message)
+}
+
 func (c Context) NoContent() error {
 	return c.Context.NoContent(http.StatusNoContent)
 }

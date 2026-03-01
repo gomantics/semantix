@@ -15,8 +15,10 @@ const (
 type Repo struct {
 	ID           int64   `json:"id"`
 	WorkspaceID  int64   `json:"workspace_id"`
+	GitTokenID   *int64  `json:"git_token_id,omitempty"`
 	URL          string  `json:"url"`
 	Branch       string  `json:"branch"`
+	IsPrivate    bool    `json:"is_private"`
 	Status       Status  `json:"status"`
 	IndexedAt    *int64  `json:"indexed_at,omitempty"`
 	ErrorMessage *string `json:"error_message,omitempty"`
@@ -26,13 +28,17 @@ type Repo struct {
 
 type CreateParams struct {
 	WorkspaceID int64
+	GitTokenID  *int64
 	URL         string
 	Branch      string
+	IsPrivate   bool
 }
 
 type UpdateParams struct {
-	URL    string
-	Branch string
+	GitTokenID *int64
+	URL        string
+	Branch     string
+	IsPrivate  bool
 }
 
 type ListParams struct {

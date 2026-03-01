@@ -44,8 +44,10 @@ type IndexRun struct {
 type Repo struct {
 	ID           int64       `json:"id"`
 	WorkspaceID  int64       `json:"workspace_id"`
+	GitTokenID   pgtype.Int8 `json:"git_token_id"`
 	Url          string      `json:"url"`
 	Branch       string      `json:"branch"`
+	IsPrivate    bool        `json:"is_private"`
 	Status       string      `json:"status"`
 	IndexedAt    pgtype.Int8 `json:"indexed_at"`
 	ErrorMessage pgtype.Text `json:"error_message"`

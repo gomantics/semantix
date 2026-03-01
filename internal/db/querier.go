@@ -6,10 +6,13 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
 	CountFilesByRepo(ctx context.Context, repoID int64) (int64, error)
+	CountReposByGitToken(ctx context.Context, gitTokenID pgtype.Int8) (int64, error)
 	CountReposByWorkspace(ctx context.Context, workspaceID int64) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CountWorkspaces(ctx context.Context) (int64, error)
@@ -44,6 +47,7 @@ type Querier interface {
 	ListReposByStatus(ctx context.Context, arg ListReposByStatusParams) ([]Repo, error)
 	ListReposByWorkspace(ctx context.Context, arg ListReposByWorkspaceParams) ([]Repo, error)
 	ListWorkspaces(ctx context.Context, arg ListWorkspacesParams) ([]Workspace, error)
+	UpdateGitToken(ctx context.Context, arg UpdateGitTokenParams) (GitToken, error)
 	UpdateIndexRunStats(ctx context.Context, arg UpdateIndexRunStatsParams) (IndexRun, error)
 	UpdateIndexRunStatus(ctx context.Context, arg UpdateIndexRunStatusParams) (IndexRun, error)
 	UpdateRepo(ctx context.Context, arg UpdateRepoParams) (Repo, error)
