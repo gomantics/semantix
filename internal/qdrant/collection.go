@@ -113,6 +113,71 @@ func createPayloadIndexes(ctx context.Context, collectionName string, l *zap.Log
 	return nil
 }
 
+// UpsertPoints batch-upserts points into the collection.
+func UpsertPoints(ctx context.Context, points []*pb.PointStruct) error {
+	collectionName := config.Qdrant.CollectionName()
+	const batchSize = 100
+
+	for i := 0; i < len(points); i += batchSize {
+		end := i + batchSize
+		if end > len(points) {
+			end = len(points)
+		}
+
+		wait := true
+		_, err := pointsClient.Upsert(ctx, &pb.UpsertPoints{
+			CollectionName: collectionName,
+			Wait:           &wait,
+			Points:         points[i:end],
+		})
+		if err != nil {
+			return fmt.Errorf("upsert batch %d-%d: %w", i, end, err)
+		}
+	}
+
+	return nil
+}
+
+// DeletePointsByFilter removes all points matching the given filter.
+func DeletePointsByFilter(ctx context.Context, filter *pb.Filter) error {
+	collectionName := config.Qdrant.CollectionName()
+	wait := true
+
+	_, err := pointsClient.Delete(ctx, &pb.DeletePoints{
+		CollectionName: collectionName,
+		Wait:           &wait,
+		Points: &pb.PointsSelector{
+			PointsSelectorOneOf: &pb.PointsSelector_Filter{
+				Filter: filter,
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("delete points: %w", err)
+	}
+
+	return nil
+}
+
+// CountPoints returns the number of points matching the given filter.
+// Pass nil to count all points in the collection.
+func CountPoints(ctx context.Context, filter *pb.Filter) (uint64, error) {
+	collectionName := config.Qdrant.CollectionName()
+
+	req := &pb.CountPoints{
+		CollectionName: collectionName,
+		Filter:         filter,
+		Exact:          boolPtr(true),
+	}
+
+	resp, err := pointsClient.Count(ctx, req)
+	if err != nil {
+		return 0, fmt.Errorf("count points: %w", err)
+	}
+
+	return resp.GetResult().GetCount(), nil
+}
+
 func boolPtr(b bool) *bool {
 	return &b
 }
