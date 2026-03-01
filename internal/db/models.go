@@ -53,6 +53,22 @@ type Repo struct {
 	Updated      int64       `json:"updated"`
 }
 
+type Session struct {
+	ID        int64       `json:"id"`
+	UserID    int64       `json:"user_id"`
+	Token     string      `json:"token"`
+	Created   int64       `json:"created"`
+	ExpiresAt pgtype.Int8 `json:"expires_at"`
+}
+
+type User struct {
+	ID           int64  `json:"id"`
+	Email        string `json:"email"`
+	PasswordHash string `json:"password_hash"`
+	Created      int64  `json:"created"`
+	Updated      int64  `json:"updated"`
+}
+
 type Workspace struct {
 	ID          int64       `json:"id"`
 	Name        string      `json:"name"`

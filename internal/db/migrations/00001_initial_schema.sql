@@ -2,6 +2,25 @@
 -- Safe to re-run: yes (all statements use IF NOT EXISTS)
 
 -- +goose Up
+CREATE TABLE IF NOT EXISTS users (
+  id            BIGSERIAL PRIMARY KEY,
+  email         TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created       BIGINT NOT NULL, -- nanoseconds since epoch
+  updated       BIGINT NOT NULL  -- nanoseconds since epoch
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id         BIGSERIAL PRIMARY KEY,
+  user_id    BIGINT NOT NULL,
+  token      TEXT NOT NULL UNIQUE, -- 32 random bytes, hex-encoded (64 chars)
+  created    BIGINT NOT NULL,      -- nanoseconds since epoch
+  expires_at BIGINT                -- nanoseconds since epoch, NULL = never expires
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
+CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
+
 CREATE TABLE IF NOT EXISTS workspaces (
   id          BIGSERIAL PRIMARY KEY,
   name        TEXT NOT NULL,
@@ -75,3 +94,5 @@ DROP TABLE IF EXISTS files;
 DROP TABLE IF EXISTS repos;
 DROP TABLE IF EXISTS git_tokens;
 DROP TABLE IF EXISTS workspaces;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS users;

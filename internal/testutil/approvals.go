@@ -6,6 +6,7 @@ import (
 
 	approvals "github.com/approvals/go-approval-tests"
 	"github.com/approvals/go-approval-tests/reporters"
+	"github.com/gomantics/semantix/internal/testflags"
 )
 
 // WithApprovals returns an Option that configures the go-approval-tests reporter
@@ -21,8 +22,10 @@ func withApprovals() Teardown {
 	approvals.UseFolder("testdata")
 
 	var closer io.Closer
-	if AcceptChanges {
+	if testflags.AcceptChanges {
 		closer = approvals.UseFrontLoadedReporter(reporters.NewReporterThatAutomaticallyApproves())
+	} else {
+		closer = approvals.UseReporter(reporters.NewQuietReporter())
 	}
 
 	return func() {

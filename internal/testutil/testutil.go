@@ -3,17 +3,9 @@
 package testutil
 
 import (
-	"flag"
 	"testing"
 	"time"
 )
-
-// AcceptChanges is a flag that, when set, auto-approves all snapshot diffs.
-var AcceptChanges bool
-
-func init() {
-	flag.BoolVar(&AcceptChanges, "accept-changes", false, "automatically accept approval test snapshots")
-}
 
 // Teardown is a cleanup function returned by an Option.
 type Teardown func()

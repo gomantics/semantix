@@ -3,13 +3,16 @@ package web
 import (
 	"net/http"
 
+	"github.com/gomantics/semantix/internal/domains/users"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
 
 type Context struct {
 	echo.Context
-	L *zap.Logger
+	L         *zap.Logger
+	UserID    int64
+	UserEmail string
 }
 
 type HandlerFunc func(ctx Context) error
@@ -21,6 +24,31 @@ func Wrap(h HandlerFunc, l *zap.Logger) echo.HandlerFunc {
 		ctx := Context{
 			Context: c,
 			L:       l.With(zap.String("request_id", rid)),
+		}
+
+		return h(ctx)
+	}
+}
+
+func WrapAuth(h HandlerFunc, l *zap.Logger) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		rid := c.Response().Header().Get(echo.HeaderXRequestID)
+
+		cookie, err := c.Cookie("session_token")
+		if err != nil || cookie.Value == "" {
+			return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+		}
+
+		user, err := users.GetUserByToken(c.Request().Context(), cookie.Value)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusUnauthorized, "unauthenticated")
+		}
+
+		ctx := Context{
+			Context:   c,
+			L:         l.With(zap.String("request_id", rid)),
+			UserID:    user.ID,
+			UserEmail: user.Email,
 		}
 
 		return h(ctx)
@@ -39,6 +67,10 @@ func (c Context) BadRequest(message string) error {
 
 func (c Context) NotFound(message string) error {
 	return c.Error(http.StatusNotFound, message)
+}
+
+func (c Context) Unauthorized(message string) error {
+	return c.Error(http.StatusUnauthorized, message)
 }
 
 func (c Context) InternalError(message string) error {

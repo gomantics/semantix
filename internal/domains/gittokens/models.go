@@ -1,6 +1,5 @@
 package gittokens
 
-// GitToken represents a stored access token for a git provider.
 type GitToken struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
