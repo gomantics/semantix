@@ -3,6 +3,7 @@ package gittokens
 import (
 	"github.com/gomantics/semantix/internal/api/web"
 	"github.com/gomantics/semantix/internal/domains/gittokens"
+	"github.com/gomantics/semantix/internal/libs/gitrepo"
 	"go.uber.org/zap"
 )
 
@@ -28,11 +29,16 @@ func Create(c web.Context) error {
 		return c.BadRequest("token is required")
 	}
 
+	provider, err := gitrepo.ParseProvider(req.Provider)
+	if err != nil {
+		return c.BadRequest(err.Error())
+	}
+
 	ctx := c.Request().Context()
 
 	token, err := gittokens.Create(ctx, gittokens.CreateParams{
 		Name:     req.Name,
-		Provider: req.Provider,
+		Provider: provider,
 		Token:    req.Token,
 	})
 	if err != nil {

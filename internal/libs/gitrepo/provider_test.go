@@ -7,6 +7,42 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestParseProvider(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input    string
+		expected Provider
+		wantErr  bool
+	}{
+		{"github", ProviderGitHub, false},
+		{"GITHUB", ProviderGitHub, false},
+		{"  github  ", ProviderGitHub, false},
+		{"gitlab", ProviderGitLab, false},
+		{"bitbucket", ProviderBitbucket, false},
+		{"unknown", ProviderUnknown, true},
+		{"invalid", ProviderUnknown, true},
+		{"", ProviderUnknown, true},
+	}
+
+	for _, tt := range tests {
+		name := tt.input
+		if name == "" {
+			name = "empty"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got, err := ParseProvider(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
 func TestDetectProvider(t *testing.T) {
 	t.Parallel()
 

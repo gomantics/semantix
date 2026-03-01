@@ -24,7 +24,7 @@ func Create(ctx context.Context, params CreateParams) (*GitToken, error) {
 	row, err := db.Tx1(ctx, func(q *db.Queries) (db.GitToken, error) {
 		return q.CreateGitToken(ctx, db.CreateGitTokenParams{
 			Name:           params.Name,
-			Provider:       params.Provider,
+			Provider:       string(params.Provider),
 			TokenEncrypted: []byte(params.Token),
 			TokenHint:      tokenHint,
 			Created:        now,
@@ -104,7 +104,7 @@ func rowToGitToken(r db.GitToken) *GitToken {
 	return &GitToken{
 		ID:       r.ID,
 		Name:     r.Name,
-		Provider: r.Provider,
+		Provider: gitrepo.Provider(r.Provider),
 		Token:    string(r.TokenEncrypted),
 		Hint:     hint,
 		Created:  r.Created,

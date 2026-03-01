@@ -20,7 +20,7 @@ func Create(ctx context.Context, params CreateParams) (*Workspace, error) {
 	now := time.Now().UnixNano()
 	settings := params.Settings
 	if settings == nil {
-		settings = make(map[string]any)
+		settings = &WorkspaceSettings{}
 	}
 	settingsJSON, err := json.Marshal(settings)
 	if err != nil {
@@ -121,7 +121,7 @@ func Update(ctx context.Context, id int64, params UpdateParams) (*Workspace, err
 	now := time.Now().UnixNano()
 	settings := params.Settings
 	if settings == nil {
-		settings = make(map[string]any)
+		settings = &WorkspaceSettings{}
 	}
 	settingsJSON, err := json.Marshal(settings)
 	if err != nil {
@@ -171,12 +171,9 @@ func Delete(ctx context.Context, id int64) error {
 }
 
 func toWorkspace(dbWorkspace db.Workspace) *Workspace {
-	var settings map[string]any
+	var settings WorkspaceSettings
 	if len(dbWorkspace.Settings) > 0 {
 		_ = json.Unmarshal(dbWorkspace.Settings, &settings)
-	}
-	if settings == nil {
-		settings = make(map[string]any)
 	}
 
 	return &Workspace{

@@ -3,6 +3,7 @@ package gitrepo
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -14,6 +15,19 @@ const (
 	ProviderBitbucket Provider = "bitbucket"
 	ProviderUnknown   Provider = "unknown"
 )
+
+// ValidProviders are the providers that can be used for git tokens.
+var ValidProviders = []Provider{ProviderGitHub, ProviderGitLab, ProviderBitbucket}
+
+// ParseProvider validates and returns a Provider from a string.
+// Only github, gitlab, and bitbucket are accepted for token configuration.
+func ParseProvider(s string) (Provider, error) {
+	p := Provider(strings.ToLower(strings.TrimSpace(s)))
+	if slices.Contains(ValidProviders, p) {
+		return p, nil
+	}
+	return "", fmt.Errorf("invalid provider %q: must be github, gitlab, or bitbucket", s)
+}
 
 // DetectProvider determines the git hosting provider from a clone URL.
 func DetectProvider(repoURL string) Provider {

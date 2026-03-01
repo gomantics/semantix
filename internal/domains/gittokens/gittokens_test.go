@@ -23,14 +23,14 @@ func TestCreate(t *testing.T) {
 
 	gt, err := gittokens.Create(ctx, gittokens.CreateParams{
 		Name:     "My GitHub Token",
-		Provider: string(gitrepo.ProviderGitHub),
+		Provider: gitrepo.ProviderGitHub,
 		Token:    "ghp_abc1234567890",
 	})
 
 	require.NoError(t, err)
 	assert.NotZero(t, gt.ID)
 	assert.Equal(t, "My GitHub Token", gt.Name)
-	assert.Equal(t, string(gitrepo.ProviderGitHub), gt.Provider)
+	assert.Equal(t, gitrepo.ProviderGitHub, gt.Provider)
 	assert.Equal(t, "ghp_abc1234567890", gt.Token)
 	assert.Equal(t, "...7890", gt.Hint)
 	assert.NotZero(t, gt.Created)
@@ -42,7 +42,7 @@ func TestCreate_shortToken(t *testing.T) {
 
 	gt, err := gittokens.Create(ctx, gittokens.CreateParams{
 		Name:     "Short Token",
-		Provider: string(gitrepo.ProviderGitHub),
+		Provider: gitrepo.ProviderGitHub,
 		Token:    "abc",
 	})
 
@@ -56,7 +56,7 @@ func TestGetByID(t *testing.T) {
 
 	created, err := gittokens.Create(ctx, gittokens.CreateParams{
 		Name:     "GetByID Token",
-		Provider: string(gitrepo.ProviderGitLab),
+		Provider: gitrepo.ProviderGitLab,
 		Token:    "glpat_123456",
 	})
 	require.NoError(t, err)
@@ -84,7 +84,7 @@ func TestFindForProvider_found(t *testing.T) {
 	// interference from other parallel tests inserting Bitbucket tokens.
 	created, err := gittokens.Create(ctx, gittokens.CreateParams{
 		Name:     "Bitbucket Token",
-		Provider: string(gitrepo.ProviderBitbucket),
+		Provider: gitrepo.ProviderBitbucket,
 		Token:    "atl_mytoken",
 	})
 	require.NoError(t, err)
@@ -92,7 +92,7 @@ func TestFindForProvider_found(t *testing.T) {
 	got, err := gittokens.FindForProvider(ctx, gitrepo.ProviderBitbucket)
 	require.NoError(t, err)
 	require.NotNil(t, got)
-	assert.Equal(t, string(gitrepo.ProviderBitbucket), got.Provider)
+	assert.Equal(t, gitrepo.ProviderBitbucket, got.Provider)
 	// The returned token must be one we created (there may be others from parallel tests).
 	assert.NotZero(t, got.ID)
 	_ = created
@@ -114,7 +114,7 @@ func TestDelete(t *testing.T) {
 
 	created, err := gittokens.Create(ctx, gittokens.CreateParams{
 		Name:     "To Delete",
-		Provider: string(gitrepo.ProviderGitHub),
+		Provider: gitrepo.ProviderGitHub,
 		Token:    "ghp_todelete",
 	})
 	require.NoError(t, err)

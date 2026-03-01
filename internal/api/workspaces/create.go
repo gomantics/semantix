@@ -9,10 +9,10 @@ import (
 )
 
 type CreateRequest struct {
-	Name        string         `json:"name"`
-	Slug        string         `json:"slug"`
-	Description *string        `json:"description,omitempty"`
-	Settings    map[string]any `json:"settings,omitempty"`
+	Name        string                 `json:"name"`
+	Slug        string                 `json:"slug"`
+	Description *string                `json:"description,omitempty"`
+	Settings    *workspaces.WorkspaceSettings `json:"settings,omitempty"`
 }
 
 func Create(c web.Context) error {

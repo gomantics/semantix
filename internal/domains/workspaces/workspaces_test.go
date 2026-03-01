@@ -33,14 +33,16 @@ func TestCreate(t *testing.T) {
 		Name:        "Test Workspace",
 		Slug:        uniqueSlug(t, "create"),
 		Description: &desc,
-		Settings:    map[string]any{"feature": true},
+		Settings: &workspaces.WorkspaceSettings{
+			ExcludePatterns: []string{"docs/", "*.test.ts"},
+		},
 	})
 
 	require.NoError(t, err)
 	assert.NotZero(t, ws.ID)
 	assert.Equal(t, "Test Workspace", ws.Name)
 	assert.Equal(t, &desc, ws.Description)
-	assert.Equal(t, map[string]any{"feature": true}, ws.Settings)
+	assert.Equal(t, []string{"docs/", "*.test.ts"}, ws.Settings.ExcludePatterns)
 	assert.NotZero(t, ws.Created)
 	assert.NotZero(t, ws.Updated)
 }
@@ -56,7 +58,8 @@ func TestCreate_defaultSettings(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.NotNil(t, ws.Settings, "settings should default to empty map")
+	assert.Empty(t, ws.Settings.ExcludePatterns, "settings should default to empty")
+	assert.Empty(t, ws.Settings.IncludePatterns, "settings should default to empty")
 }
 
 func TestCreate_slugConflict(t *testing.T) {
@@ -179,7 +182,9 @@ func TestUpdate(t *testing.T) {
 		Name:        "After Update",
 		Slug:        uniqueSlug(t, "updated"),
 		Description: &newDesc,
-		Settings:    map[string]any{"key": "value"},
+		Settings: &workspaces.WorkspaceSettings{
+			IncludePatterns: []string{"*.go"},
+		},
 	})
 	require.NoError(t, err)
 

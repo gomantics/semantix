@@ -62,6 +62,18 @@ func TestCreate_missingToken(t *testing.T) {
 	testutil.RequireStatus(t, err, http.StatusBadRequest)
 }
 
+func TestCreate_invalidProvider(t *testing.T) {
+	t.Parallel()
+	s := testutil.NewAuthState(t)
+
+	err := s.PostStatus("/v1/gittokens", map[string]any{
+		"name":     "Token " + testutil.UniqueID(),
+		"provider": "invalid",
+		"token":    "ghp_test1234567890abcd",
+	})
+	testutil.RequireStatus(t, err, http.StatusBadRequest)
+}
+
 func TestCreate_requiresAuth(t *testing.T) {
 	t.Parallel()
 	s := testutil.NewState(t)
