@@ -17,7 +17,6 @@ func TestSearch_notImplemented(t *testing.T) {
 	uid := testutil.UniqueID()
 	ws, err := s.Post("/v1/workspaces", map[string]any{
 		"name": "Search Test Workspace " + uid,
-		"slug": "search-test-ws-" + uid,
 	})
 	require.NoError(t, err)
 	wid := fmt.Sprintf("%.0f", ws["id"].(float64))

@@ -24,7 +24,6 @@ func createWorkspace(t *testing.T, s *testutil.State) string {
 	uid := testutil.UniqueID()
 	body, err := s.Post("/v1/workspaces", map[string]any{
 		"name": "Repo Test Workspace " + uid,
-		"slug": "repo-test-ws-" + uid,
 	})
 	require.NoError(t, err)
 	return fmt.Sprintf("%.0f", body["id"].(float64))

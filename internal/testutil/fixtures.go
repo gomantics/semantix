@@ -20,7 +20,6 @@ func LoadFixtures(ctx context.Context) (*Fixtures, error) {
 	ws, err := db.Tx1(ctx, func(q *db.Queries) (db.Workspace, error) {
 		return q.CreateWorkspace(ctx, db.CreateWorkspaceParams{
 			Name:     "test-workspace",
-			Slug:     fmt.Sprintf("test-workspace-%d", now),
 			Settings: []byte("{}"),
 			Created:  now,
 			Updated:  now,

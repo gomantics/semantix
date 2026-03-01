@@ -26,7 +26,6 @@ func makeWorkspace(t *testing.T) int64 {
 	ctx := context.Background()
 	ws, err := workspaces.Create(ctx, workspaces.CreateParams{
 		Name: "Repo Test Workspace",
-		Slug: fmt.Sprintf("repo-test-%s", testutil.UniqueID()),
 	})
 	require.NoError(t, err)
 	return ws.ID

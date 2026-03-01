@@ -24,14 +24,11 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE TABLE IF NOT EXISTS workspaces (
   id          BIGSERIAL PRIMARY KEY,
   name        TEXT NOT NULL,
-  slug        TEXT NOT NULL UNIQUE,
   description TEXT,
   settings    JSONB NOT NULL,
   created     BIGINT NOT NULL,  -- nanoseconds since epoch
   updated     BIGINT NOT NULL   -- nanoseconds since epoch
 );
-
-CREATE INDEX IF NOT EXISTS idx_workspaces_slug ON workspaces(slug);
 
 CREATE TABLE IF NOT EXISTS git_tokens (
   id              BIGSERIAL PRIMARY KEY,

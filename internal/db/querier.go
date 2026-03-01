@@ -37,7 +37,6 @@ type Querier interface {
 	GetSessionByToken(ctx context.Context, arg GetSessionByTokenParams) (GetSessionByTokenRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetWorkspaceByID(ctx context.Context, id int64) (Workspace, error)
-	GetWorkspaceBySlug(ctx context.Context, slug string) (Workspace, error)
 	ListFilesByRepo(ctx context.Context, repoID int64) ([]File, error)
 	ListGitTokens(ctx context.Context) ([]GitToken, error)
 	ListGitTokensByProvider(ctx context.Context, provider string) ([]GitToken, error)

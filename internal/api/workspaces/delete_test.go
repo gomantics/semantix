@@ -16,7 +16,6 @@ func TestDelete_success(t *testing.T) {
 	uid := testutil.UniqueID()
 	created, err := s.Post("/v1/workspaces", map[string]any{
 		"name": "Delete Workspace " + uid,
-		"slug": "del-ws-" + uid,
 	})
 	require.NoError(t, err)
 

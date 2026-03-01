@@ -26,7 +26,6 @@ func TestList_withItems(t *testing.T) {
 	uid := testutil.UniqueID()
 	_, err := s.Post("/v1/workspaces", map[string]any{
 		"name": "Listed Workspace " + uid,
-		"slug": "listed-ws-" + uid,
 	})
 	require.NoError(t, err)
 
@@ -50,14 +49,12 @@ func TestList_approvals(t *testing.T) {
 	uid := testutil.UniqueID()
 	_, err := s.Post("/v1/workspaces", map[string]any{
 		"name": "Approvals List Workspace " + uid,
-		"slug": "approvals-list-ws-" + uid,
 	})
 	require.NoError(t, err)
 
 	body, err := s.Get("/v1/workspaces")
 	require.NoError(t, err)
 
-	// Scrub the nested workspaces array to avoid non-deterministic ids/timestamps.
 	body["workspaces"] = "[SCRUBBED]"
 	body["total"] = "[SCRUBBED]"
 	approvals.VerifyJSONStruct(t, body)

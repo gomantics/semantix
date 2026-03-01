@@ -72,7 +72,6 @@ type User struct {
 type Workspace struct {
 	ID          int64       `json:"id"`
 	Name        string      `json:"name"`
-	Slug        string      `json:"slug"`
 	Description pgtype.Text `json:"description"`
 	Settings    []byte      `json:"settings"`
 	Created     int64       `json:"created"`

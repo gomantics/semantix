@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/gomantics/semantix/internal/db"
 	"github.com/gomantics/semantix/internal/domains/indexing"
@@ -46,7 +45,6 @@ func makeWorkspaceAndRepo(t *testing.T) (int64, repos.Repo) {
 
 	ws, err := workspaces.Create(ctx, workspaces.CreateParams{
 		Name: "Worker Test Workspace",
-		Slug: fmt.Sprintf("worker-test-%s-%d", testutil.UniqueID(), time.Now().UnixNano()),
 	})
 	require.NoError(t, err)
 

@@ -11,10 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-var (
-	ErrNotFound      = errors.New("workspace not found")
-	ErrAlreadyExists = errors.New("workspace with this slug already exists")
-)
+var ErrNotFound = errors.New("workspace not found")
 
 func Create(ctx context.Context, params CreateParams) (*Workspace, error) {
 	now := time.Now().UnixNano()
@@ -27,18 +24,9 @@ func Create(ctx context.Context, params CreateParams) (*Workspace, error) {
 		return nil, err
 	}
 
-	dbWorkspace, err := db.Tx1(ctx, func(q *db.Queries) (db.Workspace, error) {
-		_, err := q.GetWorkspaceBySlug(ctx, params.Slug)
-		if err == nil {
-			return db.Workspace{}, ErrAlreadyExists
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return db.Workspace{}, err
-		}
-
+	dbWorkspace, err := db.Query1(ctx, func(q *db.Queries) (db.Workspace, error) {
 		return q.CreateWorkspace(ctx, db.CreateWorkspaceParams{
 			Name:        params.Name,
-			Slug:        params.Slug,
 			Description: pgconv.ToText(params.Description),
 			Settings:    settingsJSON,
 			Created:     now,
@@ -55,19 +43,6 @@ func Create(ctx context.Context, params CreateParams) (*Workspace, error) {
 func GetByID(ctx context.Context, id int64) (*Workspace, error) {
 	dbWorkspace, err := db.Query1(ctx, func(q *db.Queries) (db.Workspace, error) {
 		return q.GetWorkspaceByID(ctx, id)
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-	return toWorkspace(dbWorkspace), nil
-}
-
-func GetBySlug(ctx context.Context, slug string) (*Workspace, error) {
-	dbWorkspace, err := db.Query1(ctx, func(q *db.Queries) (db.Workspace, error) {
-		return q.GetWorkspaceBySlug(ctx, slug)
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -128,19 +103,10 @@ func Update(ctx context.Context, id int64, params UpdateParams) (*Workspace, err
 		return nil, err
 	}
 
-	dbWorkspace, err := db.Tx1(ctx, func(q *db.Queries) (db.Workspace, error) {
-		existing, err := q.GetWorkspaceBySlug(ctx, params.Slug)
-		if err == nil && existing.ID != id {
-			return db.Workspace{}, ErrAlreadyExists
-		}
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return db.Workspace{}, err
-		}
-
+	dbWorkspace, err := db.Query1(ctx, func(q *db.Queries) (db.Workspace, error) {
 		return q.UpdateWorkspace(ctx, db.UpdateWorkspaceParams{
 			ID:          id,
 			Name:        params.Name,
-			Slug:        params.Slug,
 			Description: pgconv.ToText(params.Description),
 			Settings:    settingsJSON,
 			Updated:     now,
@@ -179,7 +145,6 @@ func toWorkspace(dbWorkspace db.Workspace) *Workspace {
 	return &Workspace{
 		ID:          dbWorkspace.ID,
 		Name:        dbWorkspace.Name,
-		Slug:        dbWorkspace.Slug,
 		Description: pgconv.FromText(dbWorkspace.Description),
 		Settings:    settings,
 		Created:     dbWorkspace.Created,

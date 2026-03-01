@@ -12,7 +12,6 @@ type WorkspaceSettings struct {
 type Workspace struct {
 	ID          int64             `json:"id"`
 	Name        string            `json:"name"`
-	Slug        string            `json:"slug"`
 	Description *string           `json:"description,omitempty"`
 	Settings    WorkspaceSettings `json:"settings"`
 	Created     int64             `json:"created"`
@@ -22,7 +21,6 @@ type Workspace struct {
 // CreateParams are the parameters for creating a workspace
 type CreateParams struct {
 	Name        string
-	Slug        string
 	Description *string
 	Settings    *WorkspaceSettings
 }
@@ -30,7 +28,6 @@ type CreateParams struct {
 // UpdateParams are the parameters for updating a workspace
 type UpdateParams struct {
 	Name        string
-	Slug        string
 	Description *string
 	Settings    *WorkspaceSettings
 }

@@ -141,7 +141,6 @@ func Signup(ctx context.Context, params CreateParams) (*SignupResult, error) {
 
 		_, err = q.CreateWorkspace(ctx, db.CreateWorkspaceParams{
 			Name:        "Default",
-			Slug:        "default",
 			Description: pgtype.Text{Valid: false},
 			Settings:    []byte("{}"),
 			Created:     now,

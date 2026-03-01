@@ -17,7 +17,6 @@ func TestGet_success(t *testing.T) {
 	uid := testutil.UniqueID()
 	created, err := s.Post("/v1/workspaces", map[string]any{
 		"name": "Get Workspace " + uid,
-		"slug": "get-ws-" + uid,
 	})
 	require.NoError(t, err)
 
