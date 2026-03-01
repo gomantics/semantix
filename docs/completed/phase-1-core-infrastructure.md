@@ -16,12 +16,12 @@ This phase establishes the foundational infrastructure: database schemas, vector
 
 Set up the core relational schema for metadata storage.
 
-- [ ] **Workspaces table**
+- [x] **Workspaces table**
   - `id` (UUID, primary key)
   - `name` (string, unique)
   - `created_at`, `updated_at` (timestamps)
 
-- [ ] **Repositories table**
+- [x] **Repositories table**
   - `id` (UUID, primary key)
   - `workspace_id` (UUID, foreign key)
   - `url` (string, git URL)
@@ -31,7 +31,7 @@ Set up the core relational schema for metadata storage.
   - `error_message` (text, nullable)
   - `created_at`, `updated_at` (timestamps)
 
-- [ ] **Files table**
+- [x] **Files table**
   - `id` (UUID, primary key)
   - `repo_id` (UUID, foreign key)
   - `path` (string, relative path)
@@ -40,7 +40,7 @@ Set up the core relational schema for metadata storage.
   - `language` (string, detected)
   - `indexed_at` (timestamp)
 
-- [ ] **Git Tokens table**
+- [x] **Git Tokens table**
   - `id` (UUID, primary key)
   - `name` (string, display name)
   - `provider` (enum: github, gitlab, bitbucket)
@@ -48,11 +48,11 @@ Set up the core relational schema for metadata storage.
   - `created_at` (timestamp)
 
 **Files to create/modify:**
-- `db/schema/workspaces.sql`
-- `db/schema/repos.sql`
-- `db/schema/files.sql`
-- `db/schema/git_tokens.sql`
-- `db/queries/*.sql` (SQLC queries)
+- `internal/db/schema/workspaces.sql`
+- `internal/db/schema/repos.sql`
+- `internal/db/schema/files.sql`
+- `internal/db/schema/git_tokens.sql`
+- `internal/db/queries/*.sql` (SQLC queries)
 
 ---
 
@@ -60,12 +60,12 @@ Set up the core relational schema for metadata storage.
 
 Configure Qdrant for vector storage with proper indexing.
 
-- [ ] **Create collection** with:
+- [x] **Create collection** with:
   - Vector size: 1536 (OpenAI `text-embedding-3-small`)
   - Distance metric: Cosine
   - On-disk storage enabled
 
-- [ ] **Payload schema** (stored with each vector):
+- [x] **Payload schema** (stored with each vector):
   ```json
   {
     "workspace_id": "uuid",
@@ -81,41 +81,41 @@ Configure Qdrant for vector storage with proper indexing.
   }
   ```
 
-- [ ] **Create payload indexes** for:
-  - `workspace_id` (keyword) - required for multi-tenancy
-  - `repo_id` (keyword) - filter by repo
+- [x] **Create payload indexes** for:
+  - `workspace_id` (integer) - required for multi-tenancy
+  - `repo_id` (integer) - filter by repo
+  - `file_id` (integer) - filter by file
   - `language` (keyword) - filter by language
   - `file_path` (keyword) - path pattern matching
 
 **Files to create/modify:**
-- `libs/qdrant/client.go` - connection management
-- `libs/qdrant/collection.go` - collection setup, upsert, search
+- `internal/qdrant/init.go` - connection management
+- `internal/qdrant/collection.go` - collection setup, upsert, search
 
 ---
 
 ### 1.3 Configuration Management
 
-Implement hierarchical config: defaults → TOML file → environment variables.
+Implement hierarchical config: defaults -> TOML file -> environment variables.
 
-- [ ] **Config struct** with sections:
+- [x] **Config struct** with sections:
   - `Server` (port, host)
-  - `Postgres` (DSN)
-  - `Qdrant` (address, collection name, API key)
-  - `OpenAI` (API key, model)
+  - `Database` (DSN)
+  - `Qdrant` (address, collection name)
+  - `OpenAI` (API key)
   - `Indexing` (workers, chunk size, cache settings)
-  - `Git` (repos path)
 
-- [ ] **Loading order**:
+- [x] **Loading order**:
   1. Embedded defaults
   2. `config.toml` file (optional)
-  3. Environment variables (e.g., `SEMANTIX_POSTGRES_DSN`)
+  3. Environment variables (e.g., `CONFIG_DATABASE_DSN`)
 
-- [ ] **Validation** on startup
+- [x] **Validation** on startup
 
 **Files to create/modify:**
 - `config/config.go` - struct definitions
 - `config/config.toml` - default configuration
-- `config/config.gen.go` - generated helpers (if using code gen)
+- `config/config.gen.go` - generated helpers
 
 ---
 
@@ -123,19 +123,17 @@ Implement hierarchical config: defaults → TOML file → environment variables.
 
 Development environment with all dependencies.
 
-- [ ] **PostgreSQL 17** container
+- [x] **PostgreSQL 17** container
   - Volume for data persistence
   - Health check
   - Default credentials for dev
 
-- [ ] **Qdrant** container
+- [x] **Qdrant** container
   - Volume for storage
   - Expose REST (6333) and gRPC (6334) ports
   - Health check
 
-- [ ] **Network** for service communication
-
-- [ ] **Optional: pgAdmin** for database UI
+- [x] **Network** for service communication (implicit default)
 
 **Files to create/modify:**
 - `docker-compose.yml`
@@ -146,32 +144,32 @@ Development environment with all dependencies.
 
 Basic health endpoint for infrastructure verification.
 
-- [ ] **GET /v1/health** returns:
+- [x] **GET /v1/health** returns:
   ```json
   {
-    "status": "healthy",
-    "postgres": "connected",
-    "qdrant": "connected",
+    "status": "ok",
+    "database": "ok",
+    "qdrant": "ok",
     "version": "0.1.0"
   }
   ```
 
-- [ ] Check actual connectivity to Postgres and Qdrant
-- [ ] Return appropriate status codes (200 OK, 503 Service Unavailable)
+- [x] Check actual connectivity to Postgres and Qdrant
+- [x] Return appropriate status codes (200 OK, 503 Service Unavailable)
 
 **Files to create/modify:**
-- `api/health/get.go`
-- `api/health/router.go`
+- `internal/api/health/get.go`
+- `internal/api/health/router.go`
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] `docker-compose up` starts Postgres and Qdrant successfully
-- [ ] Application connects to both services on startup
-- [ ] `/v1/health` returns healthy status with connected services
-- [ ] Database migrations apply cleanly
-- [ ] Qdrant collection is created with correct schema
+- [x] `docker-compose up` starts Postgres and Qdrant successfully
+- [x] Application connects to both services on startup
+- [x] `/v1/health` returns healthy status with connected services
+- [x] Database migrations apply cleanly
+- [x] Qdrant collection is created with correct schema
 
 ---
 
@@ -189,3 +187,4 @@ Basic health endpoint for infrastructure verification.
 - Use BIGINT for timestamps (nanoseconds since epoch) for consistency
 - No foreign keys in PostgreSQL - handle referential integrity in application
 - Qdrant collection name should be configurable for multi-environment support
+- IDs use BIGSERIAL (not UUID) for performance; workspace_id etc. are BIGINT

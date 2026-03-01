@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gomantics/semantix/db"
+	"github.com/gomantics/semantix/internal/db"
 	"github.com/gomantics/semantix/pkg/pgconv"
 	"github.com/jackc/pgx/v5"
 )
