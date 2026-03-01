@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -99,9 +101,38 @@ func (c *Client) ListProjectsPage(ctx context.Context, token string, page, perPa
 		}
 	}
 
+	if search != "" {
+		sortProjectsByNameRelevance(out, search)
+	}
+
 	nextPage := 0
 	if len(rows) == perPage {
 		nextPage = page + 1
 	}
 	return Page{Projects: out, NextPage: nextPage}, nil
+}
+
+func sortProjectsByNameRelevance(projects []Project, search string) {
+	lower := strings.ToLower(search)
+	slices.SortStableFunc(projects, func(a, b Project) int {
+		aName := strings.ToLower(a.Name)
+		bName := strings.ToLower(b.Name)
+		aExact := aName == lower
+		bExact := bName == lower
+		if aExact != bExact {
+			if aExact {
+				return -1
+			}
+			return 1
+		}
+		aHas := strings.Contains(aName, lower)
+		bHas := strings.Contains(bName, lower)
+		if aHas != bHas {
+			if aHas {
+				return -1
+			}
+			return 1
+		}
+		return 0
+	})
 }

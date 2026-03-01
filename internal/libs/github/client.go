@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -17,9 +18,10 @@ const (
 	apiBaseURL       = "https://api.github.com"
 	apiVersionHeader = "2022-11-28"
 	acceptHeader     = "application/vnd.github+json"
+	fetchPageSize    = 100
+	maxFetchPages    = 10
 )
 
-// repo is the JSON shape returned by both the list and search endpoints.
 type repo struct {
 	Name          string `json:"name"`
 	FullName      string `json:"full_name"`
@@ -59,11 +61,11 @@ func New() *Client {
 // ListReposPage returns one page of repositories accessible by the token.
 // Pass page=1 to start; use Page.NextPage for subsequent calls (0 means done).
 //
-// When search is non-empty the GitHub Search API is used so that filtering
-// happens server-side. When search is empty the standard list endpoint is used.
+// When search is non-empty all accessible repos are fetched from /user/repos
+// and filtered client-side so that org repos are included in results.
 func (c *Client) ListReposPage(ctx context.Context, token string, page, perPage int, search string) (Page, error) {
 	if search != "" {
-		return c.searchReposPage(ctx, token, page, perPage, search)
+		return c.searchReposPage(ctx, token, perPage, search)
 	}
 	return c.listReposPage(ctx, token, page, perPage)
 }
@@ -84,31 +86,66 @@ func (c *Client) listReposPage(ctx context.Context, token string, page, perPage 
 	return Page{Repos: out, NextPage: nextPage}, nil
 }
 
-func (c *Client) searchReposPage(ctx context.Context, token string, page, perPage int, search string) (Page, error) {
-	type searchResponse struct {
-		TotalCount int    `json:"total_count"`
-		Items      []repo `json:"items"`
+// searchReposPage fetches repos from /user/repos in batches and filters
+// client-side by name/description. This avoids the search API which returns
+// all public repos on GitHub.
+func (c *Client) searchReposPage(ctx context.Context, token string, perPage int, search string) (Page, error) {
+	lower := strings.ToLower(search)
+	var matched []Repo
+
+	for p := 1; p <= maxFetchPages; p++ {
+		u := fmt.Sprintf("%s/user/repos?per_page=%d&page=%d", apiBaseURL, fetchPageSize, p)
+
+		var rows []repo
+		if err := c.doJSON(ctx, token, u, &rows); err != nil {
+			return Page{}, err
+		}
+
+		for _, r := range rows {
+			nameLower := strings.ToLower(r.Name)
+			descLower := strings.ToLower(r.Description)
+			if strings.Contains(nameLower, lower) || strings.Contains(descLower, lower) {
+				matched = append(matched, convertRepo(r))
+			}
+		}
+
+		if len(rows) < fetchPageSize {
+			break
+		}
 	}
 
-	q := url.QueryEscape(search + " user:@me")
-	u := fmt.Sprintf("%s/search/repositories?q=%s&per_page=%d&page=%d", apiBaseURL, q, perPage, page)
+	sortByNameRelevance(matched, lower)
 
-	var result searchResponse
-	if err := c.doJSON(ctx, token, u, &result); err != nil {
-		return Page{}, err
+	if len(matched) > perPage {
+		matched = matched[:perPage]
 	}
-
-	out := convertRepos(result.Items)
-	nextPage := 0
-	if len(result.Items) == perPage {
-		nextPage = page + 1
-	}
-	return Page{Repos: out, NextPage: nextPage}, nil
+	return Page{Repos: matched}, nil
 }
 
-// doJSON performs a GET request with standard GitHub headers and decodes the
-// JSON response into dst. It enforces a response body size limit to prevent
-// unbounded reads from a misbehaving upstream.
+func sortByNameRelevance(repos []Repo, lower string) {
+	slices.SortStableFunc(repos, func(a, b Repo) int {
+		aName := strings.ToLower(a.Name)
+		bName := strings.ToLower(b.Name)
+		aExact := aName == lower
+		bExact := bName == lower
+		if aExact != bExact {
+			if aExact {
+				return -1
+			}
+			return 1
+		}
+		aHas := strings.Contains(aName, lower)
+		bHas := strings.Contains(bName, lower)
+		if aHas != bHas {
+			if aHas {
+				return -1
+			}
+			return 1
+		}
+		return 0
+	})
+}
+
 func (c *Client) doJSON(ctx context.Context, token, rawURL string, dst any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -136,17 +173,21 @@ func (c *Client) doJSON(ctx context.Context, token, rawURL string, dst any) erro
 	return nil
 }
 
+func convertRepo(r repo) Repo {
+	return Repo{
+		Name:          r.Name,
+		FullName:      r.FullName,
+		HTMLURL:       r.HTMLURL,
+		Private:       r.Private,
+		DefaultBranch: r.DefaultBranch,
+		Description:   r.Description,
+	}
+}
+
 func convertRepos(rows []repo) []Repo {
 	out := make([]Repo, len(rows))
 	for i, r := range rows {
-		out[i] = Repo{
-			Name:          r.Name,
-			FullName:      r.FullName,
-			HTMLURL:       r.HTMLURL,
-			Private:       r.Private,
-			DefaultBranch: r.DefaultBranch,
-			Description:   r.Description,
-		}
+		out[i] = convertRepo(r)
 	}
 	return out
 }
