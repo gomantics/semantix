@@ -13,6 +13,8 @@ type indexingConfig struct{}
 
 type openaiConfig struct{}
 
+type qdrantConfig struct{}
+
 type serverConfig struct{}
 
 func (databaseConfig) Dsn() string {
@@ -54,6 +56,20 @@ func (openaiConfig) ApiKey() string {
 	return ""
 }
 
+func (qdrantConfig) Address() string {
+	if v := os.Getenv("CONFIG_QDRANT_ADDRESS"); v != "" {
+		return v
+	}
+	return "localhost:6334"
+}
+
+func (qdrantConfig) CollectionName() string {
+	if v := os.Getenv("CONFIG_QDRANT_COLLECTION_NAME"); v != "" {
+		return v
+	}
+	return "semantix_chunks"
+}
+
 func (serverConfig) CorsAllowedOrigins() []string {
 	if v := os.Getenv("CONFIG_SERVER_CORS_ALLOWED_ORIGINS"); v != "" {
 		// Array overrides not supported via env vars
@@ -81,5 +97,6 @@ var (
 	Database databaseConfig
 	Indexing indexingConfig
 	Openai   openaiConfig
+	Qdrant   qdrantConfig
 	Server   serverConfig
 )

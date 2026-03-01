@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   name        TEXT NOT NULL,
   slug        TEXT NOT NULL UNIQUE,
   description TEXT,
-  settings    JSONB NOT NULL DEFAULT '{}',
+  settings    JSONB NOT NULL,
   created     BIGINT NOT NULL,  -- nanoseconds since epoch
   updated     BIGINT NOT NULL
 );

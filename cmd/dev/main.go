@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/gomantics/semantix/db"
 	"github.com/gomantics/semantix/internal/api"
+	"github.com/gomantics/semantix/internal/db"
+	"github.com/gomantics/semantix/internal/qdrant"
 	"github.com/gomantics/semantix/pkg/logger"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
@@ -19,6 +20,7 @@ func main() {
 		}),
 		fx.Invoke(
 			db.Init,
+			qdrant.Init,
 			api.Run,
 		),
 		fx.WithLogger(func(l *zap.Logger) fxevent.Logger {
