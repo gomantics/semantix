@@ -65,6 +65,7 @@ func TestGetByID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, created.ID, got.ID)
 	assert.Equal(t, "GetByID Token", got.Name)
+	assert.Equal(t, "...3456", got.Hint, "token_hint should be persisted and returned")
 }
 
 func TestGetByID_notFound(t *testing.T) {

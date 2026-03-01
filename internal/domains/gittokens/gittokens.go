@@ -8,6 +8,7 @@ import (
 	"github.com/gomantics/semantix/internal/db"
 	"github.com/gomantics/semantix/internal/libs/gitrepo"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var ErrNotFound = errors.New("git token not found")
@@ -15,11 +16,17 @@ var ErrNotFound = errors.New("git token not found")
 func Create(ctx context.Context, params CreateParams) (*GitToken, error) {
 	now := time.Now().UnixNano()
 
-	row, err := db.Tx1(ctx, func(q *db.Queries) (db.CreateGitTokenRow, error) {
+	tokenHint := pgtype.Text{}
+	if len(params.Token) >= 4 {
+		tokenHint = pgtype.Text{String: params.Token[len(params.Token)-4:], Valid: true}
+	}
+
+	row, err := db.Tx1(ctx, func(q *db.Queries) (db.GitToken, error) {
 		return q.CreateGitToken(ctx, db.CreateGitTokenParams{
 			Name:           params.Name,
 			Provider:       params.Provider,
 			TokenEncrypted: []byte(params.Token),
+			TokenHint:      tokenHint,
 			Created:        now,
 		})
 	})
@@ -27,11 +34,11 @@ func Create(ctx context.Context, params CreateParams) (*GitToken, error) {
 		return nil, err
 	}
 
-	return toGitToken(row.ID, row.Name, row.Provider, string(row.TokenEncrypted), now), nil
+	return rowToGitToken(row), nil
 }
 
 func GetByID(ctx context.Context, id int64) (*GitToken, error) {
-	row, err := db.Query1(ctx, func(q *db.Queries) (db.GetGitTokenByIDRow, error) {
+	row, err := db.Query1(ctx, func(q *db.Queries) (db.GitToken, error) {
 		return q.GetGitTokenByID(ctx, id)
 	})
 	if err != nil {
@@ -41,12 +48,12 @@ func GetByID(ctx context.Context, id int64) (*GitToken, error) {
 		return nil, err
 	}
 
-	return toGitToken(row.ID, row.Name, row.Provider, string(row.TokenEncrypted), row.Created), nil
+	return rowToGitToken(row), nil
 }
 
 // FindForProvider returns the first available token for the given provider.
 func FindForProvider(ctx context.Context, provider gitrepo.Provider) (*GitToken, error) {
-	rows, err := db.Query1(ctx, func(q *db.Queries) ([]db.ListGitTokensByProviderRow, error) {
+	rows, err := db.Query1(ctx, func(q *db.Queries) ([]db.GitToken, error) {
 		return q.ListGitTokensByProvider(ctx, string(provider))
 	})
 	if err != nil {
@@ -57,12 +64,11 @@ func FindForProvider(ctx context.Context, provider gitrepo.Provider) (*GitToken,
 		return nil, nil
 	}
 
-	r := rows[0]
-	return toGitToken(r.ID, r.Name, r.Provider, string(r.TokenEncrypted), r.Created), nil
+	return rowToGitToken(rows[0]), nil
 }
 
 func List(ctx context.Context) ([]GitToken, error) {
-	rows, err := db.Query1(ctx, func(q *db.Queries) ([]db.ListGitTokensRow, error) {
+	rows, err := db.Query1(ctx, func(q *db.Queries) ([]db.GitToken, error) {
 		return q.ListGitTokens(ctx)
 	})
 	if err != nil {
@@ -71,7 +77,7 @@ func List(ctx context.Context) ([]GitToken, error) {
 
 	tokens := make([]GitToken, len(rows))
 	for i, r := range rows {
-		tokens[i] = *toGitToken(r.ID, r.Name, r.Provider, string(r.TokenEncrypted), r.Created)
+		tokens[i] = *rowToGitToken(r)
 	}
 	return tokens, nil
 }
@@ -89,18 +95,18 @@ func Delete(ctx context.Context, id int64) error {
 	})
 }
 
-func toGitToken(id int64, name, provider, token string, created int64) *GitToken {
+func rowToGitToken(r db.GitToken) *GitToken {
 	hint := ""
-	if len(token) >= 4 {
-		hint = "..." + token[len(token)-4:]
+	if r.TokenHint.Valid {
+		hint = "..." + r.TokenHint.String
 	}
 
 	return &GitToken{
-		ID:       id,
-		Name:     name,
-		Provider: provider,
-		Token:    token,
+		ID:       r.ID,
+		Name:     r.Name,
+		Provider: r.Provider,
+		Token:    string(r.TokenEncrypted),
 		Hint:     hint,
-		Created:  created,
+		Created:  r.Created,
 	}
 }
