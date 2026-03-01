@@ -61,6 +61,21 @@ func FindForProvider(ctx context.Context, provider gitrepo.Provider) (*GitToken,
 	return toGitToken(r.ID, r.Name, r.Provider, string(r.TokenEncrypted), r.Created), nil
 }
 
+func List(ctx context.Context) ([]GitToken, error) {
+	rows, err := db.Query1(ctx, func(q *db.Queries) ([]db.ListGitTokensRow, error) {
+		return q.ListGitTokens(ctx)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	tokens := make([]GitToken, len(rows))
+	for i, r := range rows {
+		tokens[i] = *toGitToken(r.ID, r.Name, r.Provider, string(r.TokenEncrypted), r.Created)
+	}
+	return tokens, nil
+}
+
 func Delete(ctx context.Context, id int64) error {
 	return db.Tx(ctx, func(q *db.Queries) error {
 		_, err := q.GetGitTokenByID(ctx, id)

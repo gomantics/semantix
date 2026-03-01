@@ -11,11 +11,14 @@ import (
 type Querier interface {
 	CountFilesByRepo(ctx context.Context, repoID int64) (int64, error)
 	CountReposByWorkspace(ctx context.Context, workspaceID int64) (int64, error)
+	CountUsers(ctx context.Context) (int64, error)
 	CountWorkspaces(ctx context.Context) (int64, error)
 	CreateFile(ctx context.Context, arg CreateFileParams) (File, error)
 	CreateGitToken(ctx context.Context, arg CreateGitTokenParams) (CreateGitTokenRow, error)
 	CreateIndexRun(ctx context.Context, arg CreateIndexRunParams) (IndexRun, error)
 	CreateRepo(ctx context.Context, arg CreateRepoParams) (Repo, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error)
 	DeleteFile(ctx context.Context, id int64) error
 	DeleteFilesByPaths(ctx context.Context, arg DeleteFilesByPathsParams) error
@@ -24,12 +27,15 @@ type Querier interface {
 	DeleteIndexRunsByRepo(ctx context.Context, repoID int64) error
 	DeleteRepo(ctx context.Context, id int64) error
 	DeleteReposByWorkspace(ctx context.Context, workspaceID int64) error
+	DeleteSession(ctx context.Context, token string) error
 	DeleteWorkspace(ctx context.Context, id int64) error
 	GetFileByID(ctx context.Context, id int64) (File, error)
 	GetFileByRepoAndPath(ctx context.Context, arg GetFileByRepoAndPathParams) (File, error)
 	GetGitTokenByID(ctx context.Context, id int64) (GetGitTokenByIDRow, error)
 	GetIndexRunByID(ctx context.Context, id int64) (IndexRun, error)
 	GetRepoByID(ctx context.Context, id int64) (Repo, error)
+	GetSessionByToken(ctx context.Context, arg GetSessionByTokenParams) (GetSessionByTokenRow, error)
+	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetWorkspaceByID(ctx context.Context, id int64) (Workspace, error)
 	GetWorkspaceBySlug(ctx context.Context, slug string) (Workspace, error)
 	ListFilesByRepo(ctx context.Context, repoID int64) ([]File, error)
