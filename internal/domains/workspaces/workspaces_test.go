@@ -49,8 +49,8 @@ func TestCreate_defaultSettings(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Empty(t, ws.Settings.ExcludePatterns, "settings should default to empty")
-	assert.Empty(t, ws.Settings.IncludePatterns, "settings should default to empty")
+	assert.Equal(t, workspaces.DefaultSettings().ExcludePatterns, ws.Settings.ExcludePatterns, "settings should default to DefaultSettings")
+	assert.Empty(t, ws.Settings.IncludePatterns, "include patterns should default to empty")
 }
 
 func TestGetByID(t *testing.T) {
