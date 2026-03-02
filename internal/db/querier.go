@@ -31,6 +31,7 @@ type Querier interface {
 	DeleteRepo(ctx context.Context, id int64) error
 	DeleteReposByWorkspace(ctx context.Context, workspaceID int64) error
 	DeleteSession(ctx context.Context, token string) error
+	DeleteSetting(ctx context.Context, key string) error
 	DeleteWorkspace(ctx context.Context, id int64) error
 	GetFileByID(ctx context.Context, id int64) (File, error)
 	GetFileByRepoAndPath(ctx context.Context, arg GetFileByRepoAndPathParams) (File, error)
@@ -38,6 +39,7 @@ type Querier interface {
 	GetIndexRunByID(ctx context.Context, id int64) (IndexRun, error)
 	GetRepoByID(ctx context.Context, id int64) (Repo, error)
 	GetSessionByToken(ctx context.Context, arg GetSessionByTokenParams) (GetSessionByTokenRow, error)
+	GetSettingByKey(ctx context.Context, key string) (Setting, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetWorkspaceByID(ctx context.Context, id int64) (Workspace, error)
 	ListFilesByRepo(ctx context.Context, repoID int64) ([]File, error)
@@ -46,6 +48,7 @@ type Querier interface {
 	ListIndexRunsByRepo(ctx context.Context, arg ListIndexRunsByRepoParams) ([]IndexRun, error)
 	ListReposByStatus(ctx context.Context, arg ListReposByStatusParams) ([]Repo, error)
 	ListReposByWorkspace(ctx context.Context, arg ListReposByWorkspaceParams) ([]Repo, error)
+	ListSettings(ctx context.Context) ([]Setting, error)
 	ListWorkspaces(ctx context.Context, arg ListWorkspacesParams) ([]Workspace, error)
 	UpdateGitToken(ctx context.Context, arg UpdateGitTokenParams) (GitToken, error)
 	UpdateIndexRunStats(ctx context.Context, arg UpdateIndexRunStatsParams) (IndexRun, error)
@@ -54,6 +57,7 @@ type Querier interface {
 	UpdateRepoStatus(ctx context.Context, arg UpdateRepoStatusParams) (Repo, error)
 	UpdateWorkspace(ctx context.Context, arg UpdateWorkspaceParams) (Workspace, error)
 	UpsertFile(ctx context.Context, arg UpsertFileParams) (File, error)
+	UpsertSetting(ctx context.Context, arg UpsertSettingParams) (Setting, error)
 }
 
 var _ Querier = (*Queries)(nil)

@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gomantics/semantix/internal/api/web"
+	"github.com/gomantics/semantix/internal/domains/indexing"
 	"github.com/gomantics/semantix/internal/domains/repos"
 	"go.uber.org/zap"
 )
@@ -31,5 +32,6 @@ func Reindex(c web.Context) error {
 		return c.InternalError("failed to trigger reindex")
 	}
 
+	indexing.Trigger()
 	return c.OK(repo)
 }

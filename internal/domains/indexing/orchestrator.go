@@ -15,18 +15,37 @@ const pollInterval = 60 * time.Second
 
 // Orchestrator polls for pending repos and dispatches indexing workers.
 type Orchestrator struct {
-	l      *zap.Logger
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	sem    chan struct{}
+	l       *zap.Logger
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	sem     chan struct{}
+	trigger chan struct{}
+}
+
+var globalOrchestrator *Orchestrator
+
+// Trigger nudges the orchestrator to check for pending repos immediately
+// instead of waiting for the next poll tick. Safe to call concurrently;
+// a no-op if the orchestrator hasn't started or is already processing.
+func Trigger() {
+	o := globalOrchestrator
+	if o == nil {
+		return
+	}
+	select {
+	case o.trigger <- struct{}{}:
+	default:
+	}
 }
 
 // Run starts the orchestrator as part of the fx lifecycle.
 func Run(lc fx.Lifecycle, l *zap.Logger) {
 	o := &Orchestrator{
-		l:   l.Named("indexing"),
-		sem: make(chan struct{}, config.Indexing.MaxConcurrentJobs()),
+		l:       l.Named("indexing"),
+		sem:     make(chan struct{}, config.Indexing.MaxConcurrentJobs()),
+		trigger: make(chan struct{}, 1),
 	}
+	globalOrchestrator = o
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
@@ -74,6 +93,8 @@ func (o *Orchestrator) poll(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			o.processPending(ctx)
+		case <-o.trigger:
 			o.processPending(ctx)
 		}
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/gomantics/semantix/internal/api/health"
 	"github.com/gomantics/semantix/internal/api/repositories"
 	"github.com/gomantics/semantix/internal/api/search"
+	"github.com/gomantics/semantix/internal/api/settings"
 	"github.com/gomantics/semantix/internal/api/workspaces"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -123,6 +124,7 @@ func configureMiddleware(e *echo.Echo, l *zap.Logger) {
 func configureRoutes(e *echo.Echo, l *zap.Logger) {
 	health.Configure(e, l)
 	auth.Configure(e, l)
+	settings.Configure(e, l)
 	gittokens.Configure(e, l)
 	workspaces.Configure(e, l)
 	repositories.Configure(e, l)

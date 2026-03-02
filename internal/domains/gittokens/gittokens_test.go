@@ -13,7 +13,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	main := testutil.Main(m, testutil.WithPostgres())
+	main := testutil.Main(m, testutil.WithPostgres(), testutil.WithEncryptionKey())
 	os.Exit(main.Run())
 }
 

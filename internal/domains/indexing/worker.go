@@ -14,6 +14,7 @@ import (
 	"github.com/gomantics/semantix/internal/db"
 	"github.com/gomantics/semantix/internal/domains/gittokens"
 	"github.com/gomantics/semantix/internal/domains/repos"
+	"github.com/gomantics/semantix/internal/domains/settings"
 	"github.com/gomantics/semantix/internal/domains/workspaces"
 	"github.com/gomantics/semantix/internal/libs/chunking"
 	"github.com/gomantics/semantix/internal/libs/gitrepo"
@@ -44,18 +45,32 @@ func WithEmbedder(e openai.Embedder) WorkerOption {
 	return func(w *Worker) { w.embedder = e }
 }
 
-// NewWorker creates a Worker with optional overrides. Production code uses
-// the real cloner and the default OpenAI embedder.
+// NewWorker creates a Worker with optional overrides.
 func NewWorker(l *zap.Logger, opts ...WorkerOption) *Worker {
 	w := &Worker{
-		l:        l,
-		cloner:   &gitrepo.DefaultCloner{},
-		embedder: openai.GetDefaultEmbedder(),
+		l:      l,
+		cloner: &gitrepo.DefaultCloner{},
 	}
 	for _, opt := range opts {
 		opt(w)
 	}
 	return w
+}
+
+// embedderOrInit returns the configured embedder, lazily creating one from the
+// stored OpenAI API key if none was injected (e.g. via WithEmbedder in tests).
+func (w *Worker) embedderOrInit(ctx context.Context) (openai.Embedder, error) {
+	if w.embedder != nil {
+		return w.embedder, nil
+	}
+
+	apiKey, err := settings.GetOpenAIKey()
+	if err != nil {
+		return nil, fmt.Errorf("load OpenAI key: %w", err)
+	}
+
+	w.embedder = openai.NewClient(apiKey)
+	return w.embedder, nil
 }
 
 // runStats tracks progress during an indexing run.
@@ -294,7 +309,12 @@ func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string
 		texts[i] = fmt.Sprintf("File: %s\n\n%s", c.FilePath, c.Content)
 	}
 
-	embResult, err := w.embedder.GenerateEmbeddings(ctx, w.l, texts)
+	embedder, err := w.embedderOrInit(ctx)
+	if err != nil {
+		return err
+	}
+
+	embResult, err := embedder.GenerateEmbeddings(ctx, w.l, texts)
 	if err != nil {
 		return fmt.Errorf("generate embeddings: %w", err)
 	}

@@ -7,6 +7,8 @@ import (
 
 	"github.com/gomantics/semantix/internal/db"
 	"github.com/gomantics/semantix/internal/domains/repos"
+	"github.com/gomantics/semantix/internal/domains/settings"
+	"github.com/gomantics/semantix/internal/libs/crypto"
 	"github.com/gomantics/semantix/internal/libs/gitrepo"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -18,6 +20,16 @@ var (
 )
 
 func Create(ctx context.Context, params CreateParams) (*GitToken, error) {
+	encKey := settings.EncryptionKey()
+	if encKey == nil {
+		return nil, errors.New("app not initialized: encryption key unavailable")
+	}
+
+	encrypted, err := crypto.Encrypt([]byte(params.Token), encKey)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now().UnixNano()
 
 	tokenHint := pgtype.Text{}
@@ -29,7 +41,7 @@ func Create(ctx context.Context, params CreateParams) (*GitToken, error) {
 		return q.CreateGitToken(ctx, db.CreateGitTokenParams{
 			Name:           params.Name,
 			Provider:       string(params.Provider),
-			TokenEncrypted: []byte(params.Token),
+			TokenEncrypted: encrypted,
 			TokenHint:      tokenHint,
 			Created:        now,
 		})
@@ -38,7 +50,7 @@ func Create(ctx context.Context, params CreateParams) (*GitToken, error) {
 		return nil, err
 	}
 
-	return rowToGitToken(row), nil
+	return rowToGitToken(row)
 }
 
 func GetByID(ctx context.Context, id int64) (*GitToken, error) {
@@ -52,10 +64,20 @@ func GetByID(ctx context.Context, id int64) (*GitToken, error) {
 		return nil, err
 	}
 
-	return rowToGitToken(row), nil
+	return rowToGitToken(row)
 }
 
 func Update(ctx context.Context, id int64, params UpdateParams) (*GitToken, error) {
+	encKey := settings.EncryptionKey()
+	if encKey == nil {
+		return nil, errors.New("app not initialized: encryption key unavailable")
+	}
+
+	encrypted, err := crypto.Encrypt([]byte(params.Token), encKey)
+	if err != nil {
+		return nil, err
+	}
+
 	tokenHint := pgtype.Text{}
 	if len(params.Token) >= 4 {
 		tokenHint = pgtype.Text{String: params.Token[len(params.Token)-4:], Valid: true}
@@ -73,7 +95,7 @@ func Update(ctx context.Context, id int64, params UpdateParams) (*GitToken, erro
 		return q.UpdateGitToken(ctx, db.UpdateGitTokenParams{
 			ID:             id,
 			Name:           params.Name,
-			TokenEncrypted: []byte(params.Token),
+			TokenEncrypted: encrypted,
 			TokenHint:      tokenHint,
 		})
 	})
@@ -81,7 +103,7 @@ func Update(ctx context.Context, id int64, params UpdateParams) (*GitToken, erro
 		return nil, err
 	}
 
-	return rowToGitToken(row), nil
+	return rowToGitToken(row)
 }
 
 // FindForProvider returns the first available token for the given provider.
@@ -97,7 +119,7 @@ func FindForProvider(ctx context.Context, provider gitrepo.Provider) (*GitToken,
 		return nil, nil
 	}
 
-	return rowToGitToken(rows[0]), nil
+	return rowToGitToken(rows[0])
 }
 
 func List(ctx context.Context) ([]GitToken, error) {
@@ -110,7 +132,11 @@ func List(ctx context.Context) ([]GitToken, error) {
 
 	tokens := make([]GitToken, len(rows))
 	for i, r := range rows {
-		tokens[i] = *rowToGitToken(r)
+		t, err := rowToGitToken(r)
+		if err != nil {
+			return nil, err
+		}
+		tokens[i] = *t
 	}
 	return tokens, nil
 }
@@ -136,7 +162,17 @@ func Delete(ctx context.Context, id int64) error {
 	})
 }
 
-func rowToGitToken(r db.GitToken) *GitToken {
+func rowToGitToken(r db.GitToken) (*GitToken, error) {
+	encKey := settings.EncryptionKey()
+	if encKey == nil {
+		return nil, errors.New("app not initialized: encryption key unavailable")
+	}
+
+	plaintext, err := crypto.Decrypt(r.TokenEncrypted, encKey)
+	if err != nil {
+		return nil, err
+	}
+
 	hint := ""
 	if r.TokenHint.Valid {
 		hint = "..." + r.TokenHint.String
@@ -146,8 +182,8 @@ func rowToGitToken(r db.GitToken) *GitToken {
 		ID:       r.ID,
 		Name:     r.Name,
 		Provider: gitrepo.Provider(r.Provider),
-		Token:    string(r.TokenEncrypted),
+		Token:    string(plaintext),
 		Hint:     hint,
 		Created:  r.Created,
-	}
+	}, nil
 }

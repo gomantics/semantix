@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gomantics/semantix/internal/db"
+	"github.com/gomantics/semantix/internal/domains/settings"
 	"github.com/gomantics/semantix/internal/domains/workspaces"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -189,6 +190,10 @@ func Signup(ctx context.Context, params CreateParams) (*SignupResult, error) {
 			Updated:     now,
 		})
 		if err != nil {
+			return SignupResult{}, err
+		}
+
+		if err := settings.GenerateEncryptionKey(ctx, q); err != nil {
 			return SignupResult{}, err
 		}
 

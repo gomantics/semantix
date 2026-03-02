@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gomantics/semantix/internal/api/web"
+	"github.com/gomantics/semantix/internal/domains/indexing"
 	"github.com/gomantics/semantix/internal/domains/repos"
 	"go.uber.org/zap"
 )
@@ -47,6 +48,8 @@ func Create(c web.Context) error {
 		c.L.Error("failed to create repo", zap.Error(err), zap.Int64("wid", wid))
 		return c.InternalError("failed to create repo")
 	}
+
+	indexing.Trigger()
 
 	return c.Created(repo)
 }

@@ -63,6 +63,13 @@ type Session struct {
 	ExpiresAt pgtype.Int8 `json:"expires_at"`
 }
 
+type Setting struct {
+	Key      string `json:"key"`
+	Value    []byte `json:"value"`
+	IsSecret bool   `json:"is_secret"`
+	Updated  int64  `json:"updated"`
+}
+
 type User struct {
 	ID           int64  `json:"id"`
 	Email        string `json:"email"`

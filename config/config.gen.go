@@ -11,8 +11,6 @@ type databaseConfig struct{}
 
 type indexingConfig struct{}
 
-type openaiConfig struct{}
-
 type qdrantConfig struct{}
 
 type serverConfig struct{}
@@ -47,13 +45,6 @@ func (indexingConfig) MaxFileSizeBytes() int64 {
 		}
 	}
 	return 1048576
-}
-
-func (openaiConfig) ApiKey() string {
-	if v := os.Getenv("CONFIG_OPENAI_API_KEY"); v != "" {
-		return v
-	}
-	return ""
 }
 
 func (qdrantConfig) Address() string {
@@ -96,7 +87,6 @@ func Environment() string {
 var (
 	Database databaseConfig
 	Indexing indexingConfig
-	Openai   openaiConfig
 	Qdrant   qdrantConfig
 	Server   serverConfig
 )

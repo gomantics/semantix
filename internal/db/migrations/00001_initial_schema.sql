@@ -86,8 +86,16 @@ CREATE TABLE IF NOT EXISTS index_runs (
 CREATE INDEX IF NOT EXISTS idx_index_runs_repo_id ON index_runs(repo_id);
 CREATE INDEX IF NOT EXISTS idx_index_runs_status ON index_runs(status);
 
+CREATE TABLE IF NOT EXISTS settings (
+  key       TEXT PRIMARY KEY,
+  value     BYTEA NOT NULL,
+  is_secret BOOLEAN NOT NULL DEFAULT false,
+  updated   BIGINT NOT NULL -- nanoseconds since epoch
+);
+
 -- +goose Down
 -- Drop in reverse dependency order.
+DROP TABLE IF EXISTS settings;
 DROP TABLE IF EXISTS index_runs;
 DROP TABLE IF EXISTS files;
 DROP TABLE IF EXISTS repos;

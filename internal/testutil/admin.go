@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gomantics/semantix/internal/db"
+	"github.com/gomantics/semantix/internal/domains/settings"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -52,6 +53,12 @@ func withAdminUser() Teardown {
 
 	AdminCreds.Email = email
 	AdminCreds.Password = password
+
+	// Generate and cache an encryption key so token operations work in tests.
+	// This mirrors what users.Signup does in production.
+	if settings.EncryptionKey() == nil {
+		withEncryptionKey()
+	}
 
 	return func() {}
 }
