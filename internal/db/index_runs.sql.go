@@ -52,6 +52,19 @@ func (q *Queries) DeleteIndexRunsByRepo(ctx context.Context, repoID int64) error
 	return err
 }
 
+const failOrphanedIndexRuns = `-- name: FailOrphanedIndexRuns :exec
+UPDATE index_runs
+SET status = 'failed',
+    completed_at = $1,
+    error_message = 'interrupted by server restart'
+WHERE status = 'running'
+`
+
+func (q *Queries) FailOrphanedIndexRuns(ctx context.Context, completedAt pgtype.Int8) error {
+	_, err := q.db.Exec(ctx, failOrphanedIndexRuns, completedAt)
+	return err
+}
+
 const getIndexRunByID = `-- name: GetIndexRunByID :one
 SELECT id, repo_id, status, started_at, completed_at, files_processed, chunks_created, embeddings_generated, embeddings_cached, error_message, duration_ms
 FROM index_runs

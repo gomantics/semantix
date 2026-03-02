@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	ErrNotFound        = errors.New("repo not found")
-	ErrTokenRequired   = errors.New("git token is required for private repositories")
+	ErrNotFound      = errors.New("repo not found")
+	ErrTokenRequired = errors.New("git token is required for private repositories")
 )
 
 func Create(ctx context.Context, params CreateParams) (*Repo, error) {
@@ -29,14 +29,14 @@ func Create(ctx context.Context, params CreateParams) (*Repo, error) {
 
 	dbRepo, err := db.Tx1(ctx, func(q *db.Queries) (db.Repo, error) {
 		return q.CreateRepo(ctx, db.CreateRepoParams{
-			WorkspaceID:  params.WorkspaceID,
-			GitTokenID:   pgconv.ToInt8(params.GitTokenID),
-			Url:          params.URL,
-			Branch:       branch,
-			IsPrivate:    params.IsPrivate,
-			Status:       string(StatusPending),
-			Created:      now,
-			Updated:      now,
+			WorkspaceID: params.WorkspaceID,
+			GitTokenID:  pgconv.ToInt8(params.GitTokenID),
+			Url:         params.URL,
+			Branch:      branch,
+			IsPrivate:   params.IsPrivate,
+			Status:      string(StatusPending),
+			Created:     now,
+			Updated:     now,
 		})
 	})
 	if err != nil {
@@ -113,6 +113,31 @@ func UpdateStatus(ctx context.Context, id int64, status Status, errMsg *string) 
 			IndexedAt:    pgconv.ToInt8(indexedAt),
 			ErrorMessage: pgconv.ToText(errMsg),
 			Updated:      now,
+		})
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	return toRepo(dbRepo), nil
+}
+
+// ResetForReindex clears all cached file records for the repo and sets its
+// status to pending in a single atomic transaction.
+func ResetForReindex(ctx context.Context, id int64) (*Repo, error) {
+	now := time.Now().UnixNano()
+
+	dbRepo, err := db.Tx1(ctx, func(q *db.Queries) (db.Repo, error) {
+		if err := q.DeleteFilesByRepo(ctx, id); err != nil {
+			return db.Repo{}, err
+		}
+		return q.UpdateRepoStatus(ctx, db.UpdateRepoStatusParams{
+			ID:      id,
+			Status:  string(StatusPending),
+			Updated: now,
 		})
 	})
 	if err != nil {

@@ -178,6 +178,25 @@ func CountPoints(ctx context.Context, filter *pb.Filter) (uint64, error) {
 	return resp.GetResult().GetCount(), nil
 }
 
+// SearchPoints performs a vector similarity search in the collection.
+// filter may be nil to search across all points.
+func SearchPoints(ctx context.Context, vector []float32, filter *pb.Filter, limit uint64) ([]*pb.ScoredPoint, error) {
+	collectionName := config.Qdrant.CollectionName()
+
+	resp, err := pointsClient.Query(ctx, &pb.QueryPoints{
+		CollectionName: collectionName,
+		Query:          pb.NewQuery(vector...),
+		Filter:         filter,
+		Limit:          &limit,
+		WithPayload:    pb.NewWithPayload(true),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("search points: %w", err)
+	}
+
+	return resp.GetResult(), nil
+}
+
 func boolPtr(b bool) *bool {
 	return &b
 }

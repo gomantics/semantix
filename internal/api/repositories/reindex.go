@@ -23,7 +23,7 @@ func Reindex(c web.Context) error {
 
 	ctx := c.Request().Context()
 
-	repo, err := repos.UpdateStatus(ctx, rid, repos.StatusPending, nil)
+	repo, err := repos.ResetForReindex(ctx, rid)
 	if err != nil {
 		if errors.Is(err, repos.ErrNotFound) {
 			return c.NotFound("repo not found")

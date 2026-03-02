@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/gomantics/semantix/config"
+	"github.com/gomantics/semantix/internal/db"
 	"github.com/gomantics/semantix/internal/domains/repos"
+	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -63,13 +65,36 @@ func (o *Orchestrator) start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	o.cancel = cancel
 
-	o.wg.Add(1)
-	go o.poll(ctx)
-
 	o.l.Info("orchestrator started",
 		zap.Int64("max_workers", config.Indexing.MaxConcurrentJobs()),
 		zap.Duration("poll_interval", pollInterval),
 	)
+
+	o.wg.Add(1)
+	go o.poll(ctx)
+}
+
+// recover resets repos and index_runs that were left in transient states by a
+// previous server crash. It runs once synchronously before the first poll so
+// that the recovered repos are immediately visible to the poll loop.
+func (o *Orchestrator) recover(ctx context.Context) {
+	now := time.Now().UnixNano()
+
+	if err := db.Tx(ctx, func(q *db.Queries) error {
+		return q.FailOrphanedIndexRuns(ctx, pgtype.Int8{Int64: now, Valid: true})
+	}); err != nil {
+		o.l.Error("failed to fail orphaned index runs", zap.Error(err))
+	} else {
+		o.l.Info("marked orphaned index_runs as failed (status=running -> failed)")
+	}
+
+	if err := db.Tx(ctx, func(q *db.Queries) error {
+		return q.ResetStaleRepos(ctx, now)
+	}); err != nil {
+		o.l.Error("failed to reset stale repos", zap.Error(err))
+	} else {
+		o.l.Info("reset stale repos (cloning/indexing -> pending)")
+	}
 }
 
 func (o *Orchestrator) stop() {
@@ -85,7 +110,9 @@ func (o *Orchestrator) poll(ctx context.Context) {
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
 
-	// Run once immediately on startup.
+	// Recover any repos/runs left in transient states by a previous crash,
+	// then immediately process whatever is now pending.
+	o.recover(ctx)
 	o.processPending(ctx)
 
 	for {

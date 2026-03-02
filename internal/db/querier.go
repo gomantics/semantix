@@ -32,7 +32,9 @@ type Querier interface {
 	DeleteReposByWorkspace(ctx context.Context, workspaceID int64) error
 	DeleteSession(ctx context.Context, token string) error
 	DeleteSetting(ctx context.Context, key string) error
+	DeleteStaleFiles(ctx context.Context, arg DeleteStaleFilesParams) error
 	DeleteWorkspace(ctx context.Context, id int64) error
+	FailOrphanedIndexRuns(ctx context.Context, completedAt pgtype.Int8) error
 	GetFileByID(ctx context.Context, id int64) (File, error)
 	GetFileByRepoAndPath(ctx context.Context, arg GetFileByRepoAndPathParams) (File, error)
 	GetGitTokenByID(ctx context.Context, id int64) (GitToken, error)
@@ -50,6 +52,7 @@ type Querier interface {
 	ListReposByWorkspace(ctx context.Context, arg ListReposByWorkspaceParams) ([]Repo, error)
 	ListSettings(ctx context.Context) ([]Setting, error)
 	ListWorkspaces(ctx context.Context, arg ListWorkspacesParams) ([]Workspace, error)
+	ResetStaleRepos(ctx context.Context, updated int64) error
 	UpdateGitToken(ctx context.Context, arg UpdateGitTokenParams) (GitToken, error)
 	UpdateIndexRunStats(ctx context.Context, arg UpdateIndexRunStatsParams) (IndexRun, error)
 	UpdateIndexRunStatus(ctx context.Context, arg UpdateIndexRunStatusParams) (IndexRun, error)

@@ -3,6 +3,7 @@ package indexing
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"io/fs"
 	"os"
@@ -221,6 +222,9 @@ func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string
 
 	var allChunks []chunking.Chunk
 	var allFileIDs []int64
+	// seenFileIDs tracks every file ID touched in this run (both cached and re-indexed).
+	// Used at the end to remove DB records for files that no longer exist in the repo.
+	var seenFileIDs []int64
 
 	for _, f := range files {
 		select {
@@ -235,9 +239,13 @@ func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string
 			continue
 		}
 
+		if isBinary(content) {
+			continue
+		}
+
 		contentHash := fmt.Sprintf("%x", sha256.Sum256(content))
 
-		// Check if file content has changed
+		// Check if file content has changed.
 		existing, _ := db.Query1(ctx, func(q *db.Queries) (db.File, error) {
 			return q.GetFileByRepoAndPath(ctx, db.GetFileByRepoAndPathParams{
 				RepoID: repo.ID,
@@ -245,6 +253,7 @@ func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string
 			})
 		})
 		if existing.ID != 0 && existing.ContentHash == contentHash {
+			seenFileIDs = append(seenFileIDs, existing.ID)
 			stats.filesProcessed++
 			continue
 		}
@@ -270,12 +279,26 @@ func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string
 			return fmt.Errorf("upsert file %s: %w", f.relPath, err)
 		}
 
+		seenFileIDs = append(seenFileIDs, dbFile.ID)
+
 		for i := range chunks {
 			allChunks = append(allChunks, chunks[i])
 			allFileIDs = append(allFileIDs, dbFile.ID)
 		}
 
 		stats.filesProcessed++
+	}
+
+	// Remove DB records for files that were deleted from the repo since the last index.
+	if len(seenFileIDs) > 0 {
+		if err := db.Tx(ctx, func(q *db.Queries) error {
+			return q.DeleteStaleFiles(ctx, db.DeleteStaleFilesParams{
+				RepoID:  repo.ID,
+				Column2: seenFileIDs,
+			})
+		}); err != nil {
+			w.l.Warn("failed to delete stale file records", zap.Error(err))
+		}
 	}
 
 	if len(allChunks) == 0 {
@@ -285,25 +308,7 @@ func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string
 
 	stats.chunksCreated = int32(len(allChunks))
 
-	// Delete old points for this repo before upserting new ones
-	if err := qdrant.DeletePointsByFilter(ctx, &pb.Filter{
-		Must: []*pb.Condition{
-			{
-				ConditionOneOf: &pb.Condition_Field{
-					Field: &pb.FieldCondition{
-						Key: "repo_id",
-						Match: &pb.Match{
-							MatchValue: &pb.Match_Integer{Integer: repo.ID},
-						},
-					},
-				},
-			},
-		},
-	}); err != nil {
-		w.l.Warn("failed to delete old points, continuing", zap.Error(err))
-	}
-
-	// Build embedding inputs
+	// Build embedding inputs.
 	texts := make([]string, len(allChunks))
 	for i, c := range allChunks {
 		texts[i] = fmt.Sprintf("File: %s\n\n%s", c.FilePath, c.Content)
@@ -314,6 +319,8 @@ func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string
 		return err
 	}
 
+	// Generate embeddings BEFORE touching Qdrant so that a failure here leaves
+	// the existing indexed data intact (no data loss on transient API errors).
 	embResult, err := embedder.GenerateEmbeddings(ctx, w.l, texts)
 	if err != nil {
 		return fmt.Errorf("generate embeddings: %w", err)
@@ -321,13 +328,13 @@ func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string
 
 	stats.embeddingsGenerated = int32(len(embResult.Embeddings))
 
-	// Build Qdrant points
+	// Build Qdrant points using a deterministic hash-based ID derived from
+	// repoID + filePath + chunkIndex so IDs are stable across re-indexes and
+	// never collide regardless of chunk count per file.
 	points := make([]*pb.PointStruct, len(allChunks))
 	for i, c := range allChunks {
-		pointID := pb.NewIDNum(uint64(allFileIDs[i])*10000 + uint64(i))
-
 		points[i] = &pb.PointStruct{
-			Id:      pointID,
+			Id:      pb.NewIDNum(chunkPointID(repo.ID, c.FilePath, i)),
 			Vectors: pb.NewVectors(embResult.Embeddings[i]...),
 			Payload: map[string]*pb.Value{
 				"workspace_id":  pb.NewValueInt(repo.WorkspaceID),
@@ -344,11 +351,61 @@ func (w *Worker) indexFiles(ctx context.Context, repo repos.Repo, rootDir string
 		}
 	}
 
+	// Upsert new/updated points first. Only after a successful upsert do we
+	// remove stale points for files that were re-indexed (old chunks from the
+	// same file that may no longer exist after re-chunking).
 	if err := qdrant.UpsertPoints(ctx, points); err != nil {
 		return fmt.Errorf("upsert points: %w", err)
 	}
 
+	// Delete Qdrant points for files that were re-indexed in this run. Their
+	// new points were just upserted above; any leftover old chunks (e.g. from
+	// a file that shrank) need to be cleaned up by file_id filter.
+	reindexedFileIDs := make(map[int64]struct{}, len(allFileIDs))
+	for _, fid := range allFileIDs {
+		reindexedFileIDs[fid] = struct{}{}
+	}
+	for fid := range reindexedFileIDs {
+		if err := qdrant.DeletePointsByFilter(ctx, &pb.Filter{
+			Must: []*pb.Condition{
+				{
+					ConditionOneOf: &pb.Condition_Field{
+						Field: &pb.FieldCondition{
+							Key: "file_id",
+							Match: &pb.Match{
+								MatchValue: &pb.Match_Integer{Integer: fid},
+							},
+						},
+					},
+				},
+			},
+		}); err != nil {
+			w.l.Warn("failed to delete old points for file, continuing",
+				zap.Int64("file_id", fid), zap.Error(err))
+		}
+	}
+
+	// Re-upsert after the old points are cleared so the new ones are the only
+	// ones present for each re-indexed file.
+	if err := qdrant.UpsertPoints(ctx, points); err != nil {
+		return fmt.Errorf("re-upsert points after stale cleanup: %w", err)
+	}
+
 	return nil
+}
+
+// chunkPointID produces a stable uint64 Qdrant point ID from repoID, filePath,
+// and chunk index. Using a hash avoids collisions regardless of chunk count.
+func chunkPointID(repoID int64, filePath string, chunkIdx int) uint64 {
+	h := sha256.New()
+	var buf [8]byte
+	binary.LittleEndian.PutUint64(buf[:], uint64(repoID))
+	h.Write(buf[:])
+	h.Write([]byte(filePath))
+	binary.LittleEndian.PutUint64(buf[:], uint64(chunkIdx))
+	h.Write(buf[:])
+	sum := h.Sum(nil)
+	return binary.LittleEndian.Uint64(sum[:8])
 }
 
 func (w *Worker) createRun(ctx context.Context, repoID int64) (*db.IndexRun, error) {
@@ -369,43 +426,55 @@ func (w *Worker) createRun(ctx context.Context, repoID int64) (*db.IndexRun, err
 func (w *Worker) failRun(ctx context.Context, runID, repoID int64, startTime time.Time, runErr error) {
 	duration := time.Since(startTime).Milliseconds()
 	errMsg := runErr.Error()
+	now := time.Now().UnixNano()
 
-	db.Tx1(ctx, func(q *db.Queries) (db.IndexRun, error) {
+	if _, err := db.Tx1(ctx, func(q *db.Queries) (db.IndexRun, error) {
 		return q.UpdateIndexRunStatus(ctx, db.UpdateIndexRunStatusParams{
 			ID:           runID,
 			Status:       "failed",
-			CompletedAt:  pgconv.ToInt8(&[]int64{time.Now().UnixNano()}[0]),
+			CompletedAt:  pgconv.ToInt8(&now),
 			ErrorMessage: pgconv.ToText(&errMsg),
 			DurationMs:   pgconv.ToInt8(&duration),
 		})
-	})
+	}); err != nil {
+		w.l.Error("failed to mark index run as failed", zap.Int64("run_id", runID), zap.Error(err))
+	}
 
-	repos.UpdateStatus(ctx, repoID, repos.StatusError, &errMsg)
+	if _, err := repos.UpdateStatus(ctx, repoID, repos.StatusError, &errMsg); err != nil {
+		w.l.Error("failed to set repo status to error", zap.Int64("repo_id", repoID), zap.Error(err))
+	}
 }
 
 func (w *Worker) completeRun(ctx context.Context, runID, repoID int64, startTime time.Time, stats *runStats) {
 	duration := time.Since(startTime).Milliseconds()
 	now := time.Now().UnixNano()
 
-	db.Tx1(ctx, func(q *db.Queries) (db.IndexRun, error) {
+	if _, err := db.Tx1(ctx, func(q *db.Queries) (db.IndexRun, error) {
 		return q.UpdateIndexRunStatus(ctx, db.UpdateIndexRunStatusParams{
 			ID:          runID,
 			Status:      "completed",
 			CompletedAt: pgconv.ToInt8(&now),
 			DurationMs:  pgconv.ToInt8(&duration),
 		})
-	})
+	}); err != nil {
+		w.l.Error("failed to mark index run as completed", zap.Int64("run_id", runID), zap.Error(err))
+	}
 
-	db.Tx1(ctx, func(q *db.Queries) (db.IndexRun, error) {
+	if _, err := db.Tx1(ctx, func(q *db.Queries) (db.IndexRun, error) {
 		return q.UpdateIndexRunStats(ctx, db.UpdateIndexRunStatsParams{
 			ID:                  runID,
 			FilesProcessed:      stats.filesProcessed,
 			ChunksCreated:       stats.chunksCreated,
 			EmbeddingsGenerated: stats.embeddingsGenerated,
+			EmbeddingsCached:    0,
 		})
-	})
+	}); err != nil {
+		w.l.Error("failed to update index run stats", zap.Int64("run_id", runID), zap.Error(err))
+	}
 
-	repos.UpdateStatus(ctx, repoID, repos.StatusReady, nil)
+	if _, err := repos.UpdateStatus(ctx, repoID, repos.StatusReady, nil); err != nil {
+		w.l.Error("failed to set repo status to ready", zap.Int64("repo_id", repoID), zap.Error(err))
+	}
 }
 
 func languageFromChunks(chunks []chunking.Chunk) *string {
@@ -417,6 +486,23 @@ func languageFromChunks(chunks []chunking.Chunk) *string {
 		return nil
 	}
 	return &lang
+}
+
+// isBinary reports whether content appears to be a binary (non-text) file by
+// scanning the first 8 KB for null bytes, which are essentially never present
+// in valid UTF-8/ASCII source files but are common in compiled or media files.
+func isBinary(content []byte) bool {
+	const sniffLen = 8192
+	check := content
+	if len(check) > sniffLen {
+		check = check[:sniffLen]
+	}
+	for _, b := range check {
+		if b == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // matchesAnyPattern reports whether relPath matches any of the given patterns.

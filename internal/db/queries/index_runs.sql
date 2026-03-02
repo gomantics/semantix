@@ -36,3 +36,10 @@ RETURNING id, repo_id, status, started_at, completed_at, files_processed, chunks
 -- name: DeleteIndexRunsByRepo :exec
 DELETE FROM index_runs
 WHERE repo_id = $1;
+
+-- name: FailOrphanedIndexRuns :exec
+UPDATE index_runs
+SET status = 'failed',
+    completed_at = $1,
+    error_message = 'interrupted by server restart'
+WHERE status = 'running';

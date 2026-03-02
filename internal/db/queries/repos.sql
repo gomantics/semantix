@@ -58,3 +58,9 @@ WHERE id = $1;
 -- name: DeleteReposByWorkspace :exec
 DELETE FROM repos
 WHERE workspace_id = $1;
+
+-- name: ResetStaleRepos :exec
+UPDATE repos
+SET status = 'pending',
+    updated = $1
+WHERE status IN ('cloning', 'indexing');

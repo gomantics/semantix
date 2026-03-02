@@ -96,6 +96,21 @@ func (q *Queries) DeleteFilesByRepo(ctx context.Context, repoID int64) error {
 	return err
 }
 
+const deleteStaleFiles = `-- name: DeleteStaleFiles :exec
+DELETE FROM files
+WHERE repo_id = $1 AND id != ALL($2::bigint[])
+`
+
+type DeleteStaleFilesParams struct {
+	RepoID  int64   `json:"repo_id"`
+	Column2 []int64 `json:"column_2"`
+}
+
+func (q *Queries) DeleteStaleFiles(ctx context.Context, arg DeleteStaleFilesParams) error {
+	_, err := q.db.Exec(ctx, deleteStaleFiles, arg.RepoID, arg.Column2)
+	return err
+}
+
 const getFileByID = `-- name: GetFileByID :one
 SELECT id, repo_id, path, content_hash, size_bytes, language, indexed_at
 FROM files

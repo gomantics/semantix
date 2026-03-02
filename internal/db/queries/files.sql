@@ -45,3 +45,7 @@ WHERE repo_id = $1;
 -- name: DeleteFilesByPaths :exec
 DELETE FROM files
 WHERE repo_id = $1 AND path = ANY($2::text[]);
+
+-- name: DeleteStaleFiles :exec
+DELETE FROM files
+WHERE repo_id = $1 AND id != ALL($2::bigint[]);

@@ -14,6 +14,7 @@ require (
 	github.com/gomantics/chunkx v0.0.3
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/labstack/echo/v4 v4.13.4
+	github.com/pkoukk/tiktoken-go v0.1.8
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/qdrant/go-client v1.16.2
 	github.com/sashabaranov/go-openai v1.41.2
@@ -53,6 +54,7 @@ require (
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/distribution/reference v0.6.0 // indirect
+	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect

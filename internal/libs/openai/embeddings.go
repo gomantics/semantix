@@ -4,17 +4,20 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net/http"
 	"time"
 
+	tiktoken "github.com/pkoukk/tiktoken-go"
 	"github.com/sashabaranov/go-openai"
 	"go.uber.org/zap"
 )
 
 const (
-	embeddingModel = openai.SmallEmbedding3
-	batchSize      = 2048
-	maxRetries     = 5
-	baseDelay      = 500 * time.Millisecond
+	embeddingModel      = openai.SmallEmbedding3
+	embeddingModelTikID = "text-embedding-3-small"
+	batchSize           = 2048
+	maxRetries          = 5
+	baseDelay           = 500 * time.Millisecond
 )
 
 // EmbeddingResult holds a batch of embeddings mapped by their original index.
@@ -42,7 +45,15 @@ func (c *Client) GenerateEmbeddings(ctx context.Context, l *zap.Logger, texts []
 		return &EmbeddingResult{}, nil
 	}
 
+	estimatedTokens := countTokens(l, texts)
+	l.Info("embedding request",
+		zap.Int("texts", len(texts)),
+		zap.Int("estimated_tokens", estimatedTokens),
+		zap.String("model", embeddingModelTikID),
+	)
+
 	allEmbeddings := make([][]float32, len(texts))
+	var totalPromptTokens int
 
 	for batchStart := 0; batchStart < len(texts); batchStart += batchSize {
 		batchEnd := min(batchStart+batchSize, len(texts))
@@ -53,12 +64,39 @@ func (c *Client) GenerateEmbeddings(ctx context.Context, l *zap.Logger, texts []
 			return nil, fmt.Errorf("embedding batch %d-%d: %w", batchStart, batchEnd, err)
 		}
 
+		totalPromptTokens += resp.Usage.PromptTokens
+
 		for _, emb := range resp.Data {
 			allEmbeddings[batchStart+emb.Index] = emb.Embedding
 		}
 	}
 
+	l.Info("embedding complete",
+		zap.Int("texts", len(texts)),
+		zap.Int("prompt_tokens_billed", totalPromptTokens),
+	)
+
 	return &EmbeddingResult{Embeddings: allEmbeddings}, nil
+}
+
+// countTokens estimates the total token count for texts using tiktoken.
+// Falls back to a character-based approximation if the encoder is unavailable.
+func countTokens(l *zap.Logger, texts []string) int {
+	enc, err := tiktoken.EncodingForModel(embeddingModelTikID)
+	if err != nil {
+		l.Warn("tiktoken encoder unavailable, using char approximation", zap.Error(err))
+		total := 0
+		for _, t := range texts {
+			total += len(t) / 4
+		}
+		return total
+	}
+
+	total := 0
+	for _, t := range texts {
+		total += len(enc.Encode(t, nil, nil))
+	}
+	return total
 }
 
 func createEmbeddingsWithRetry(ctx context.Context, l *zap.Logger, client *openai.Client, texts []string) (openai.EmbeddingResponse, error) {
@@ -66,7 +104,7 @@ func createEmbeddingsWithRetry(ctx context.Context, l *zap.Logger, client *opena
 
 	for attempt := range maxRetries {
 		if attempt > 0 {
-			delay := min(time.Duration(float64(baseDelay) * math.Pow(2, float64(attempt-1))), 30 * time.Second)
+			delay := min(time.Duration(float64(baseDelay)*math.Pow(2, float64(attempt-1))), 30*time.Second)
 
 			l.Warn("retrying embedding request",
 				zap.Int("attempt", attempt+1),
@@ -90,6 +128,16 @@ func createEmbeddingsWithRetry(ctx context.Context, l *zap.Logger, client *opena
 		}
 
 		lastErr = err
+
+		// Do not retry on permanent errors - auth failures, bad requests, or
+		// model-not-found will never succeed regardless of how many retries we do.
+		if apiErr, ok := err.(*openai.APIError); ok {
+			switch apiErr.HTTPStatusCode {
+			case http.StatusUnauthorized, http.StatusForbidden,
+				http.StatusBadRequest, http.StatusNotFound:
+				return openai.EmbeddingResponse{}, fmt.Errorf("permanent error (status %d), not retrying: %w", apiErr.HTTPStatusCode, err)
+			}
+		}
 	}
 
 	return openai.EmbeddingResponse{}, fmt.Errorf("failed after %d attempts: %w", maxRetries, lastErr)

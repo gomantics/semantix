@@ -22,6 +22,21 @@ var sparseExcludes = []string{
 	"*.min.js",
 	"dist/",
 	"build/",
+	// Images
+	"*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.ico", "*.bmp", "*.tiff", "*.tif", "*.svg",
+	"*.avif", "*.heic", "*.heif",
+	// Fonts
+	"*.ttf", "*.otf", "*.woff", "*.woff2", "*.eot",
+	// Audio / video
+	"*.mp3", "*.mp4", "*.wav", "*.ogg", "*.flac", "*.aac", "*.mov", "*.avi", "*.mkv", "*.webm",
+	// Compiled / binary
+	"*.exe", "*.dll", "*.so", "*.dylib", "*.a", "*.o", "*.class", "*.pyc", "*.pyo",
+	"*.wasm",
+	// Archives
+	"*.zip", "*.tar", "*.gz", "*.bz2", "*.xz", "*.7z", "*.rar",
+	// Documents / data blobs
+	"*.pdf", "*.doc", "*.docx", "*.xls", "*.xlsx", "*.ppt", "*.pptx",
+	"*.db", "*.sqlite", "*.sqlite3",
 }
 
 // CloneOptions configures a clone operation.

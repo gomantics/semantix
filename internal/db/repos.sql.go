@@ -222,6 +222,18 @@ func (q *Queries) ListReposByWorkspace(ctx context.Context, arg ListReposByWorks
 	return items, nil
 }
 
+const resetStaleRepos = `-- name: ResetStaleRepos :exec
+UPDATE repos
+SET status = 'pending',
+    updated = $1
+WHERE status IN ('cloning', 'indexing')
+`
+
+func (q *Queries) ResetStaleRepos(ctx context.Context, updated int64) error {
+	_, err := q.db.Exec(ctx, resetStaleRepos, updated)
+	return err
+}
+
 const updateRepo = `-- name: UpdateRepo :one
 UPDATE repos
 SET git_token_id = $2,
