@@ -72,5 +72,5 @@ func Update(c web.Context) error {
 		return c.InternalError("failed to save openai api key")
 	}
 
-	return c.NoContent()
+	return Get(c)
 }
